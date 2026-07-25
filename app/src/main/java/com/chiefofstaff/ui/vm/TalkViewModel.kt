@@ -3,9 +3,11 @@ package com.chiefofstaff.ui.vm
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chiefofstaff.AppContainer
+import com.chiefofstaff.data.entity.Decision
 import com.chiefofstaff.data.entity.Message
 import com.chiefofstaff.data.entity.Session
 import com.chiefofstaff.data.model.ConversationMode
+import java.time.Duration
 import com.chiefofstaff.llm.LlmOrchestrator
 import com.chiefofstaff.llm.TaskId
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -84,6 +86,30 @@ class TalkViewModel(private val container: AppContainer) : ViewModel() {
     fun saveToMemory(line: ChatLine) {
         viewModelScope.launch {
             container.captureManager.captureText(line.text)
+            _state.value = _state.value.copy(
+                lines = _state.value.lines.map { if (it === line) it.copy(saved = true) else it }
+            )
+        }
+    }
+
+    /**
+     * CNV-09 / MEM-15 — write a Decision record from a Decide-mode turn. The question is the last
+     * thing the user asked; the chosen path is the assistant's reply; a 30-day review is scheduled,
+     * which the anticipation engine (ANT-10) will surface when it comes due — so a decision is
+     * audited against its expected outcome rather than quietly forgotten.
+     */
+    fun saveAsDecision(line: ChatLine) {
+        viewModelScope.launch {
+            val question = _state.value.lines.lastOrNull { it.role == "user" }?.text.orEmpty()
+            val now = container.clock.now()
+            container.repo.graph.insertDecision(
+                Decision(
+                    question = question.ifBlank { "Decision" },
+                    chosen = line.text.take(240),
+                    reviewAt = now.plus(Duration.ofDays(30)),
+                    createdAt = now,
+                )
+            )
             _state.value = _state.value.copy(
                 lines = _state.value.lines.map { if (it === line) it.copy(saved = true) else it }
             )

@@ -54,6 +54,7 @@ fun TalkScreen(
     onSend: (String) -> Unit,
     onSetMode: (ConversationMode) -> Unit,
     onSave: (ChatLine) -> Unit,
+    onSaveDecision: (ChatLine) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var input by remember { mutableStateOf("") }
@@ -75,7 +76,9 @@ fun TalkScreen(
             }
         } else {
             LazyColumn(state = listState, modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(state.lines) { line -> ChatBubble(line, onSave) }
+                items(state.lines) { line ->
+                    ChatBubble(line, onSave, onSaveDecision, decideMode = state.mode == ConversationMode.DECIDE)
+                }
                 if (state.thinking) {
                     item { Text("…", style = MaterialTheme.typography.titleLarge, color = Palette.InkFaint, modifier = Modifier.padding(8.dp)) }
                 }
@@ -134,7 +137,12 @@ private fun ModeRow(current: ConversationMode, onSetMode: (ConversationMode) -> 
 }
 
 @Composable
-private fun ChatBubble(line: ChatLine, onSave: (ChatLine) -> Unit) {
+private fun ChatBubble(
+    line: ChatLine,
+    onSave: (ChatLine) -> Unit,
+    onSaveDecision: (ChatLine) -> Unit,
+    decideMode: Boolean,
+) {
     val isUser = line.role == "user"
     Column(horizontalAlignment = if (isUser) Alignment.End else Alignment.Start, modifier = Modifier.fillMaxWidth()) {
         NeuCard(modifier = Modifier.widthIn(max = 300.dp)) {
@@ -144,16 +152,24 @@ private fun ChatBubble(line: ChatLine, onSave: (ChatLine) -> Unit) {
                 color = if (isUser) Palette.Ink else Palette.InkMuted,
             )
         }
-        // CNV-04 — one-tap fact emission on assistant replies.
+        // CNV-04 fact emission; CNV-09 decision record in Decide mode.
         if (!isUser) {
+            val label = when {
+                line.saved -> "saved ✓"
+                decideMode -> "Save as decision"
+                else -> "Save to memory"
+            }
             Text(
-                text = if (line.saved) "saved ✓" else "Save to memory",
+                text = label,
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (line.saved) Palette.Accent else Palette.InkFaint,
                 modifier = Modifier
                     .padding(top = 4.dp, start = 4.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .then(if (line.saved) Modifier else Modifier.clickable { onSave(line) })
+                    .then(
+                        if (line.saved) Modifier
+                        else Modifier.clickable { if (decideMode) onSaveDecision(line) else onSave(line) }
+                    )
                     .padding(horizontal = 6.dp, vertical = 4.dp),
             )
         }

@@ -65,6 +65,9 @@ interface GraphDao {
     @Update suspend fun updateDecision(d: Decision)
     @Query("SELECT * FROM decision WHERE reviewAt IS NOT NULL AND reviewAt <= :now AND actualOutcome IS NULL")
     suspend fun decisionsDueForReview(now: Long): List<Decision>
+    @Query("SELECT * FROM decision ORDER BY createdAt DESC") fun decisions(): Flow<List<Decision>>
+    @Query("SELECT * FROM decision ORDER BY createdAt DESC LIMIT :limit")
+    suspend fun recentDecisions(limit: Int = 20): List<Decision>
 
     // Reference vault (encrypted values).
     @Insert suspend fun insertReference(r: ReferenceItem): Long

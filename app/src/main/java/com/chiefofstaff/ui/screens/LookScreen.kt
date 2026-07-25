@@ -146,6 +146,25 @@ fun LookScreen(
         CollapsedSection("PEOPLE", LookSection.PEOPLE, state, onToggleSection) {
             Text("People appear once people exist.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
         }
+        CollapsedSection("DECISIONS", LookSection.DECISIONS, state, onToggleSection) {
+            if (state.decisions.isEmpty()) {
+                Text("Decisions you make in Decide mode land here, with a review date.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    state.decisions.forEach { d ->
+                        Column {
+                            Text(d.question, style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
+                            Text("→ ${d.chosen}", style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted)
+                            Text(
+                                if (d.hasOutcome) "reviewed" else d.reviewLabel,
+                                style = Mono.Status,
+                                color = Palette.InkFaint,
+                            )
+                        }
+                    }
+                }
+            }
+        }
         Spacer(Modifier.height(24.dp))
     }
 }

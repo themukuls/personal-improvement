@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.Duration
 
-enum class LookSection { TIMELINE, TRENDS, DOMAINS, PEOPLE }
+enum class LookSection { TIMELINE, TRENDS, DOMAINS, PEOPLE, DECISIONS }
 
 data class LookUiState(
     val query: String = "",
@@ -28,7 +28,11 @@ data class LookUiState(
     // RES-02/04 — anti-burden.
     val proposals: List<ReductionEngine.ReductionItem> = emptyList(),
     val domainCounts: Map<Domain, Int> = emptyMap(),
+    // MEM-15 — decision archive.
+    val decisions: List<DecisionRow> = emptyList(),
 )
+
+data class DecisionRow(val question: String, val chosen: String, val reviewLabel: String, val hasOutcome: Boolean)
 
 /**
  * Backs the Look screen (§3.2, UX-05). Search over the FTS index plus four collapsed sections. Now
@@ -62,7 +66,23 @@ class LookViewModel(private val container: AppContainer) : ViewModel() {
             LookSection.TIMELINE -> loadTimeline()
             LookSection.TRENDS -> loadTrends()
             LookSection.DOMAINS -> loadReduction()
+            LookSection.DECISIONS -> loadDecisions()
             else -> Unit
+        }
+    }
+
+    /** MEM-15 — the decision archive with review dates and outcomes. */
+    private fun loadDecisions() {
+        viewModelScope.launch {
+            val zone = container.clock.zone()
+            val rows = container.repo.graph.recentDecisions(20).map { d ->
+                val review = d.reviewAt?.let {
+                    val date = java.time.LocalDate.ofInstant(it, zone)
+                    "review ${date.dayOfMonth}/${date.monthValue}"
+                } ?: ""
+                DecisionRow(d.question, d.chosen, review, d.actualOutcome != null)
+            }
+            _state.value = _state.value.copy(decisions = rows)
         }
     }
 
