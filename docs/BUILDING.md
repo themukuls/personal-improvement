@@ -64,8 +64,22 @@ Useful checks:
 | `Installed Build Tools revision X is corrupted` / missing platform 34 | Install `platforms;android-34` and `build-tools;34.0.0` via the SDK Manager. |
 | `Unsupported class file major version` / JDK errors | Use JDK 17, not 11 or 21+, for AGP 8.5. |
 
+## Release build
+
+The `release` build type minifies and shrinks with R8 (`proguard-rules.pro`). Signing is optional
+and local-only:
+
+1. Generate a keystore (once) and create `keystore.properties` from `keystore.properties.template`
+   (both are git-ignored). See the template for the `keytool` command.
+2. Build:
+   - `./gradlew assembleRelease` — signed APK when `keystore.properties` is present, otherwise an
+     unsigned, R8-shrunk APK.
+   - `./gradlew bundleRelease` — an `.aab` for the Play Store.
+
+`versionName`/`versionCode` live in `app/build.gradle.kts`; bump them per release.
+
 ## CI
 
-`.github/workflows/android-ci.yml` runs `assembleDebug` + lint on every push and PR on a
-GitHub-hosted runner (which has the Android SDK preinstalled), and uploads the debug APK as a build
-artifact. That is the authoritative "does it build" signal.
+`.github/workflows/android-ci.yml` runs `assembleDebug`, `assembleRelease` (unsigned — this is what
+exercises the R8/ProGuard rules), and lint on every push and PR on a GitHub-hosted runner, and
+uploads both APKs as build artifacts. That is the authoritative "does it build" signal.

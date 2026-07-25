@@ -32,6 +32,12 @@ jobs:
       - name: Assemble debug APK
         run: ./gradlew assembleDebug --stacktrace
 
+      # Verify the minified/shrunk release build too — this is what exercises the R8/ProGuard
+      # rules. CI has no keystore, so the APK is unsigned, but R8 still runs. A release-only
+      # shrinker failure would otherwise only surface at store-upload time.
+      - name: Assemble release APK (unsigned, R8)
+        run: ./gradlew assembleRelease --stacktrace
+
       - name: Android Lint
         run: ./gradlew lintDebug --stacktrace
         continue-on-error: true
@@ -41,4 +47,11 @@ jobs:
         with:
           name: app-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: warn
