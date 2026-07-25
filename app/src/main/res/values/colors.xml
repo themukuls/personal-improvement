@@ -1,0 +1,5 @@
+<resources>
+    <!-- Base neumorphic surface sampled from the design (Direction 1a). -->
+    <color name="neu_base">#EEF1F6</color>
+    <color name="ic_launcher_background">#EEF1F6</color>
+</resources>

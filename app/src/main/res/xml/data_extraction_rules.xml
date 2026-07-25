@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- P8/§16.8: the encrypted DB is the source of truth and is backed up via SYS-10
+     (nightly encrypted export), never via cloud auto-backup. Disable device transfer
+     and cloud backup so the SQLCipher DB and key material never leave under OS control. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="." />
+    </device-transfer>
+</data-extraction-rules>

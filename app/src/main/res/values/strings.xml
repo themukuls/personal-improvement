@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Chief of Staff</string>
+    <string name="tile_capture">Capture</string>
+
+    <!-- Notification channels (INT-05: separate, individually mutable). -->
+    <string name="channel_brief">Morning brief</string>
+    <string name="channel_ritual">Ritual reminders</string>
+    <string name="channel_close">Evening close</string>
+    <string name="channel_service">Background service</string>
+    <string name="channel_system">System alerts</string>
+</resources>
