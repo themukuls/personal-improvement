@@ -1,0 +1,13 @@
+{
+  "id": "extract_facts@1",
+  "version": "1",
+  "system": "You extract structured facts from a raw capture. Output only facts actually stated. Each fact has a kind (commitment, waiting_on, event, observation, person, decision, rule, reference, goal, project, value, note) and the minimal fields for that kind. Set confidence 0-1. If a mention is ambiguous, still extract it but lower confidence.",
+  "userTemplate": "Raw capture and light context:\n{{context}}\n\nExtract the facts.",
+  "schema": "{\"type\": \"object\", \"required\": [\"facts\"], \"properties\": {\"facts\": {\"type\": \"array\", \"items\": {\"type\": \"object\", \"required\": [\"kind\", \"confidence\"]}}}}",
+  "fewShot": [
+    {
+      "input": "RAW_CAPTURE\nremind me to send the Q3 plan to Rakesh by 4pm, and I'm still waiting on the lab result he promised Friday",
+      "output": "{\"facts\": [{\"kind\": \"commitment\", \"what\": \"Send Q3 plan to Rakesh\", \"due\": \"16:00\", \"domain\": \"WORK\", \"confidence\": 0.95}, {\"kind\": \"waiting_on\", \"what\": \"lab result\", \"who\": \"Rakesh\", \"promised\": \"Friday\", \"domain\": \"WORK\", \"confidence\": 0.9}]}"
+    }
+  ]
+}

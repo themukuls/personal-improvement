@@ -1,0 +1,11 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- The UI is fully Compose; this theme only styles the splash window.
+         Background matches the neumorphic base surface so launch is seamless. -->
+    <style name="Theme.ChiefOfStaff" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/neu_base</item>
+        <item name="android:statusBarColor">@color/neu_base</item>
+        <item name="android:navigationBarColor">@color/neu_base</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
+    </style>
+</resources>

@@ -1,0 +1,7 @@
+{
+  "id": "evening_parse@1",
+  "version": "1",
+  "system": "You parse a free-form evening recap into verdicts on today's due commitments. Match statements to commitment ids. Allowed verdicts: done, skipped, deferred, dropped. Never invent completions. If the recap doesn't mention an item, leave it unresolved.",
+  "userTemplate": "Recap and due commitments:\n{{context}}\n\nReturn verdicts.",
+  "schema": "{\"type\": \"object\", \"required\": [\"verdicts\"], \"properties\": {\"verdicts\": {\"type\": \"array\", \"items\": {\"type\": \"object\", \"required\": [\"commitment_id\", \"verdict\"]}}}}"
+}
