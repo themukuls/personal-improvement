@@ -86,6 +86,14 @@ class CommitmentDueWorker(c: Context, p: WorkerParameters) : ContainerWorker(c, 
     }
 }
 
+/** REV-03 — the Sunday 19:00 weekly audit. */
+class WeeklyAuditWorker(c: Context, p: WorkerParameters) : ContainerWorker(c, p) {
+    override suspend fun doWork(): Result = runCatching {
+        container.weeklyAudit.run()
+        Result.success()
+    }.getOrElse { AppLog.e("worker", "weekly audit failed", it); Result.retry() }
+}
+
 /** CAP-05 — periodic 15-minute calendar sync. */
 class CalendarSyncWorker(c: Context, p: WorkerParameters) : ContainerWorker(c, p) {
     override suspend fun doWork(): Result = runCatching {

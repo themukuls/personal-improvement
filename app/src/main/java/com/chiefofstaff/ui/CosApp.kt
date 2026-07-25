@@ -105,7 +105,7 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
                     }
                     Destination.Look -> {
                         val s by lookVm.state.collectAsStateWithLifecycle()
-                        LookScreen(state = s, onQuery = lookVm::onQuery, onToggleSection = lookVm::toggle)
+                        LookScreen(state = s, onQuery = lookVm::onQuery, onToggleSection = lookVm::toggle, onSetQuiet = lookVm::setQuiet)
                     }
                 }
 

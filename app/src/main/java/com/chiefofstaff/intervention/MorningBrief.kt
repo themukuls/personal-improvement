@@ -86,4 +86,5 @@ object NotificationIds {
     const val ANTICIPATION = 1004
     const val ARCHIVE = 1005
     const val SILENT_FAILURE = 1006
+    const val WEEKLY_AUDIT = 1007
 }

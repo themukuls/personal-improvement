@@ -1,6 +1,8 @@
 package com.chiefofstaff.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.chiefofstaff.ui.components.NeuCard
 import com.chiefofstaff.ui.components.SectionLabel
+import com.chiefofstaff.ui.theme.Mono
 import com.chiefofstaff.ui.theme.Palette
 import com.chiefofstaff.ui.theme.neuSurface
 import com.chiefofstaff.ui.vm.LookSection
@@ -36,6 +39,7 @@ fun LookScreen(
     state: LookUiState,
     onQuery: (String) -> Unit,
     onToggleSection: (LookSection) -> Unit,
+    onSetQuiet: (Int?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -67,13 +71,44 @@ fun LookScreen(
             }
         }
 
+        // INT-08 — quiet mode: suppress proactive output while captures keep flowing.
+        Spacer(Modifier.height(16.dp))
+        NeuCard(modifier = Modifier.fillMaxWidth()) {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SectionLabel("QUIET MODE", modifier = Modifier.weight(1f))
+                    Text(
+                        if (state.quietActive) "on" else "off",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (state.quietActive) Palette.Accent else Palette.InkFaint,
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    QuietChip("24h") { onSetQuiet(1) }
+                    QuietChip("7 days") { onSetQuiet(7) }
+                    QuietChip("Off") { onSetQuiet(null) }
+                }
+            }
+        }
+
         Spacer(Modifier.height(20.dp))
         CollapsedSection("TIMELINE", LookSection.TIMELINE, state, onToggleSection) {
             if (state.timeline.isEmpty()) Text("No captures yet.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
             else state.timeline.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted, modifier = Modifier.padding(vertical = 3.dp)) }
         }
         CollapsedSection("TRENDS", LookSection.TRENDS, state, onToggleSection) {
-            Text("Trends appear when there is data to trend.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+            val pct = state.consistencyPct
+            val mae = state.predictionAccuracyHours
+            if (pct == null && mae == null && state.healthLines.isEmpty()) {
+                Text("Trends appear when there is data to trend.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (pct != null) TrendLine("Consistency", "$pct% over 30 days")
+                    if (mae != null) TrendLine("Self-accuracy", "estimates off by ~${"%.1f".format(mae)}h")
+                    state.healthLines.forEach { TrendLine(it.substringBefore(":"), it.substringAfter(": ")) }
+                }
+            }
         }
         CollapsedSection("DOMAINS", LookSection.DOMAINS, state, onToggleSection) {
             Text("Health · Work · Money · People · Home — activate as you go.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
@@ -82,6 +117,26 @@ fun LookScreen(
             Text("People appear once people exist.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
         }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun QuietChip(text: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .neuSurface(cornerRadius = 14, elevation = 5.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.labelLarge, color = Palette.InkMuted)
+    }
+}
+
+@Composable
+private fun TrendLine(label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted, modifier = Modifier.weight(1f))
+        Text(value, style = Mono.Status, color = Palette.InkFaint)
     }
 }
 

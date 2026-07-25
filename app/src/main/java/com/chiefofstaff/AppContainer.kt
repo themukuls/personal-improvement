@@ -24,6 +24,7 @@ import com.chiefofstaff.intervention.NotificationBudget
 import com.chiefofstaff.intervention.Notifier
 import com.chiefofstaff.intervention.RitualScheduler
 import com.chiefofstaff.intervention.TtsSpeaker
+import com.chiefofstaff.intervention.WeeklyAudit
 import com.chiefofstaff.llm.ContextAssembler
 import com.chiefofstaff.llm.ContextProviders
 import com.chiefofstaff.llm.Fallback
@@ -114,6 +115,7 @@ class AppContainer(context: Context) {
     private val tts: TtsSpeaker by lazy { TtsSpeaker(appContext) }
     val morningBrief: MorningBrief by lazy { MorningBrief(repo, clock, orchestrator, fallback, tts, notifier, calendarSync) }
     val eveningClose: EveningClose by lazy { EveningClose(repo, clock, stateMachine, orchestrator, notifier) }
+    val weeklyAudit: WeeklyAudit by lazy { WeeklyAudit(repo, clock, orchestrator, consistencyScore, ledger, notifier) }
     val ritualScheduler: RitualScheduler by lazy { RitualScheduler(appContext, clock) }
 
     // --- System ---

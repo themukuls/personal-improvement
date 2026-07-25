@@ -12,6 +12,7 @@ import com.chiefofstaff.intervention.work.CommitmentDueWorker
 import com.chiefofstaff.intervention.work.EveningCloseWorker
 import com.chiefofstaff.intervention.work.MorningBriefWorker
 import com.chiefofstaff.intervention.work.NightlyBatchWorker
+import com.chiefofstaff.intervention.work.WeeklyAuditWorker
 
 /**
  * Receives ritual alarms and per-commitment due alarms. A receiver has only a few seconds, so it
@@ -40,6 +41,8 @@ class RitualAlarmReceiver : BroadcastReceiver() {
                         wm.enqueue(OneTimeWorkRequestBuilder<EveningCloseWorker>().build())
                     RitualScheduler.Ritual.NIGHTLY_BATCH ->
                         wm.enqueue(OneTimeWorkRequestBuilder<NightlyBatchWorker>().build())
+                    RitualScheduler.Ritual.WEEKLY_AUDIT ->
+                        wm.enqueue(OneTimeWorkRequestBuilder<WeeklyAuditWorker>().build())
                 }
                 // Re-arm tomorrow's occurrence.
                 RitualScheduler(context, SystemClock()).schedule(ritual)

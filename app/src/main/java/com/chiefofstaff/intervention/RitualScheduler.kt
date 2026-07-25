@@ -19,10 +19,11 @@ class RitualScheduler(
     private val context: Context,
     private val clock: Clock,
 ) {
-    enum class Ritual(val hour: Int, val minute: Int) {
+    enum class Ritual(val hour: Int, val minute: Int, val dayOfWeek: java.time.DayOfWeek? = null) {
         MORNING_BRIEF(6, 0),
         EVENING_CLOSE(21, 0),
         NIGHTLY_BATCH(2, 0),
+        WEEKLY_AUDIT(19, 0, java.time.DayOfWeek.SUNDAY),   // §9.1 Sun 19:00
     }
 
     private val alarmManager = context.getSystemService(AlarmManager::class.java)
@@ -33,7 +34,7 @@ class RitualScheduler(
     }
 
     fun schedule(ritual: Ritual) {
-        val triggerAt = nextOccurrence(LocalTime.of(ritual.hour, ritual.minute))
+        val triggerAt = nextOccurrence(LocalTime.of(ritual.hour, ritual.minute), ritual.dayOfWeek)
         val pi = ritualPendingIntent(ritual)
         // Guarded: on Android 12+ exact alarms require the (granted, sideloaded) permission.
         if (canScheduleExact()) {
@@ -73,10 +74,16 @@ class RitualScheduler(
         )
     }
 
-    private fun nextOccurrence(time: LocalTime): Long {
+    private fun nextOccurrence(time: LocalTime, dayOfWeek: java.time.DayOfWeek? = null): Long {
         val now = ZonedDateTime.now(clock.zone())
         var next = now.withHour(time.hour).withMinute(time.minute).withSecond(0).withNano(0)
-        if (!next.isAfter(now)) next = next.plusDays(1)
+        if (dayOfWeek == null) {
+            // Daily: next matching time today or tomorrow.
+            if (!next.isAfter(now)) next = next.plusDays(1)
+        } else {
+            // Weekly: advance to the next matching day-of-week at the given time.
+            while (next.dayOfWeek != dayOfWeek || !next.isAfter(now)) next = next.plusDays(1)
+        }
         return next.toInstant().toEpochMilli()
     }
 
