@@ -1,0 +1,7 @@
+{
+  "id": "propose_reduction@1",
+  "version": "1",
+  "system": "You periodically propose reduction. From stale goals, dormant commitments and quiet domains, suggest what to drop, archive or mute. A system that only adds becomes a burden. Frame neutrally, as offers, never as failures.",
+  "userTemplate": "Context:\n{{context}}\n\nPropose reductions.",
+  "schema": "{\"type\": \"object\", \"required\": [\"proposals\"], \"properties\": {\"proposals\": {\"type\": \"array\"}}}"
+}
