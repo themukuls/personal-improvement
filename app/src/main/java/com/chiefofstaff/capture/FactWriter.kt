@@ -6,10 +6,15 @@ import com.chiefofstaff.data.LifeRepository
 import com.chiefofstaff.data.entity.Commitment
 import com.chiefofstaff.data.entity.Decision
 import com.chiefofstaff.data.entity.Goal
+import com.chiefofstaff.data.entity.EventEntity
+import com.chiefofstaff.data.entity.Interaction
 import com.chiefofstaff.data.entity.Note
 import com.chiefofstaff.data.entity.Observation
 import com.chiefofstaff.data.entity.Person
+import com.chiefofstaff.data.entity.Project
+import com.chiefofstaff.data.entity.ReferenceItem
 import com.chiefofstaff.data.entity.RuleEntity
+import com.chiefofstaff.data.entity.ValueStatement
 import com.chiefofstaff.data.entity.WaitingOn
 import com.chiefofstaff.data.model.CommitmentState
 import com.chiefofstaff.data.model.Domain
@@ -42,7 +47,7 @@ class FactWriter(
                     Commitment(
                         what = fact.str("what") ?: return false,
                         dueAt = fact.str("due")?.let { parseTimeToday(it) },
-                        domain = fact.domain(),
+                        domain = fact.domain(fact.str("what")),
                         energyCost = fact.energy(),
                         state = CommitmentState.SCHEDULED,
                         sourceCaptureId = sourceCaptureId,
@@ -56,7 +61,7 @@ class FactWriter(
                     WaitingOn(
                         what = fact.str("what") ?: return false,
                         who = fact.str("who") ?: "someone",
-                        domain = fact.domain(Domain.WORK),
+                        domain = fact.domain(fact.str("what"), Domain.WORK),
                         createdAt = now, lastTouchedAt = now,
                     )
                 ); true
@@ -94,7 +99,7 @@ class FactWriter(
                 repo.graph.insertRule(
                     RuleEntity(
                         statement = fact.str("statement") ?: return false,
-                        domain = fact.domain(),
+                        domain = fact.domain(fact.str("statement")),
                         enforcement = if (fact.str("enforcement") == "hard") Enforcement.HARD else Enforcement.SOFT,
                         activeHours = fact.str("active_hours"),
                         createdAt = now,
@@ -106,10 +111,72 @@ class FactWriter(
                     Goal(
                         title = fact.str("title") ?: return false,
                         horizon = fact.str("horizon") ?: "quarter",
-                        domain = fact.domain(),
+                        domain = fact.domain(fact.str("title")),
                         metric = fact.str("metric"),
                         target = fact.str("target"),
                         createdAt = now, lastTouchedAt = now,
+                    )
+                ); true
+            }
+            "reference" -> {
+                // DOM-18 — a document/fact worth keeping. An expiry date activates expiry watch (ANT-03).
+                repo.graph.insertReference(
+                    ReferenceItem(
+                        type = fact.str("type") ?: "note",
+                        label = fact.str("label") ?: fact.str("what") ?: return false,
+                        valueEncrypted = fact.str("value") ?: "",
+                        expiresAt = fact.str("expires")?.let { parseDate(it) },
+                        createdAt = now,
+                    )
+                ); true
+            }
+            "project" -> {
+                // DOM-22 — a personal project with its own outcome and optional deadline.
+                repo.graph.insertProject(
+                    Project(
+                        title = fact.str("title") ?: fact.str("what") ?: return false,
+                        outcome = fact.str("outcome"),
+                        deadline = fact.str("deadline")?.let { parseDate(it) },
+                        domain = fact.domain(fact.str("title") ?: fact.str("what"), Domain.PROJECTS),
+                        createdAt = now, lastTouchedAt = now,
+                    )
+                ); true
+            }
+            "event" -> {
+                // DOM-20/CAP-05 — a dated commitment on the calendar (trip, appointment, booking).
+                val start = fact.str("start")?.let { parseDateTime(it) }
+                    ?: fact.str("when")?.let { parseDateTime(it) } ?: return false
+                repo.graph.upsertEvent(
+                    EventEntity(
+                        title = fact.str("title") ?: fact.str("what") ?: return false,
+                        start = start,
+                        location = fact.str("location"),
+                        source = "capture",
+                        createdAt = now,
+                    )
+                ); true
+            }
+            "value" -> {
+                repo.graph.insertValue(
+                    ValueStatement(
+                        statement = fact.str("statement") ?: fact.str("text") ?: return false,
+                        rank = fact.num("rank")?.toInt() ?: 99,
+                        createdAt = now,
+                    )
+                ); true
+            }
+            "interaction" -> {
+                // DOM-15 — a logged contact with a person; links to (or creates) the person.
+                val who = fact.str("who") ?: fact.str("name") ?: return false
+                val person = repo.graph.findPerson(who)
+                    ?: Person(name = who, createdAt = now).let { it.copy(id = repo.graph.insertPerson(it)) }
+                repo.graph.insertInteraction(
+                    Interaction(
+                        personId = person.id,
+                        channel = fact.str("channel"),
+                        whenAt = now,
+                        summary = fact.str("summary") ?: fact.str("what"),
+                        createdAt = now,
                     )
                 ); true
             }
@@ -127,8 +194,17 @@ class FactWriter(
     private fun JsonObject.str(key: String): String? =
         this[key]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }?.takeIf { it.isNotBlank() && it != "null" }
     private fun JsonObject.num(key: String): Float? = str(key)?.toFloatOrNull()
-    private fun JsonObject.domain(default: Domain = Domain.NONE): Domain =
-        str("domain")?.let { runCatching { Domain.valueOf(it.uppercase()) }.getOrNull() } ?: default
+    /**
+     * The model's explicit domain tag wins; otherwise infer one from the fact's text so the capture
+     * lands in the right domain even offline (DOM-05 activation, P11). Only [Domain.NONE] gaps fall
+     * through to the classifier — an explicit tag is always honoured.
+     */
+    private fun JsonObject.domain(text: String?, default: Domain = Domain.NONE): Domain {
+        str("domain")?.let { runCatching { Domain.valueOf(it.uppercase()) }.getOrNull() }
+            ?.takeIf { it != Domain.NONE }
+            ?.let { return it }
+        return DomainClassifier.classify(text, default)
+    }
     private fun JsonObject.energy(): EnergyCost =
         str("energy")?.let { runCatching { EnergyCost.valueOf(it.uppercase()) }.getOrNull() } ?: EnergyCost.MEDIUM
 
@@ -136,6 +212,21 @@ class FactWriter(
     private fun parseTimeToday(raw: String): java.time.Instant? {
         val t = parseLocalTime(raw) ?: return null
         return clock.today().atTime(t).atZone(clock.zone()).toInstant()
+    }
+
+    /** Parse an ISO date ("2026-08-15") into an Instant at start of day; unknown formats yield null. */
+    private fun parseDate(raw: String): java.time.Instant? {
+        val d = runCatching { java.time.LocalDate.parse(raw.trim().take(10)) }.getOrNull() ?: return null
+        return d.atStartOfDay(clock.zone()).toInstant()
+    }
+
+    /** Parse "2026-08-15" or "2026-08-15 09:30" / "2026-08-15T09:30" into an Instant. */
+    private fun parseDateTime(raw: String): java.time.Instant? {
+        val s = raw.trim().replace('T', ' ')
+        val datePart = s.take(10)
+        val date = runCatching { java.time.LocalDate.parse(datePart) }.getOrNull() ?: return null
+        val time = s.drop(10).trim().let { if (it.isBlank()) null else parseLocalTime(it) } ?: LocalTime.of(9, 0)
+        return date.atTime(time).atZone(clock.zone()).toInstant()
     }
 
     private fun parseLocalTime(raw: String): LocalTime? {
