@@ -46,4 +46,7 @@ interface StateDao {
     @Insert suspend fun logNotification(n: NotificationLog): Long
     @Query("SELECT COUNT(*) FROM notification_log WHERE postedDate = :date AND essential = 0")
     suspend fun discretionaryCountToday(date: String): Int
+
+    @Query("SELECT COUNT(*) FROM notification_log WHERE postedDate = :date AND channel = :channel")
+    suspend fun countChannelToday(date: String, channel: String): Int
 }

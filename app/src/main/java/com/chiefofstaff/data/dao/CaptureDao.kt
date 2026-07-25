@@ -46,6 +46,10 @@ interface CaptureDao {
     @Query("SELECT * FROM capture WHERE id = :id")
     suspend fun byId(id: Long): Capture?
 
+    /** SYS-11 — snapshot for the full JSON export. */
+    @Query("SELECT * FROM capture ORDER BY createdAt DESC LIMIT :limit")
+    suspend fun snapshot(limit: Int = 100_000): List<Capture>
+
     // --- Review queue (MEM-05) ---
     @Insert suspend fun enqueueReview(item: ReviewQueueItem): Long
 

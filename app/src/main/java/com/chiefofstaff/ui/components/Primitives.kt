@@ -40,7 +40,7 @@ fun NeuCard(
 ) {
     Box(
         modifier = modifier
-            .neuSurface(cornerRadius = cornerRadius.dp)
+            .neuSurface(cornerRadius = cornerRadius)
             .padding(padding),
     ) { content() }
 }
@@ -60,7 +60,7 @@ fun GradientCard(
 ) {
     Box(
         modifier = modifier
-            .neuSurface(cornerRadius = cornerRadius.dp)
+            .neuSurface(cornerRadius = cornerRadius)
             .clip(RoundedCornerShape(cornerRadius.dp)),
     ) {
         Box(

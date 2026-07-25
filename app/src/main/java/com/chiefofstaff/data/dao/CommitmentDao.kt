@@ -16,6 +16,10 @@ interface CommitmentDao {
     @Query("SELECT * FROM commitment WHERE id = :id")
     suspend fun byId(id: Long): Commitment?
 
+    /** SYS-11 — snapshot for the full JSON export. */
+    @Query("SELECT * FROM commitment ORDER BY createdAt DESC")
+    suspend fun allCommitments(): List<Commitment>
+
     /** The Now list: today's open items in due order. Terminal-state items drop off automatically. */
     @Query(
         """

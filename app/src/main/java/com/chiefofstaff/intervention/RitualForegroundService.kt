@@ -1,6 +1,7 @@
 package com.chiefofstaff.intervention
 
 import android.app.Notification
+import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -8,7 +9,6 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
-import androidx.lifecycle.LifecycleService
 import com.chiefofstaff.R
 import com.chiefofstaff.core.AppLog
 
@@ -18,15 +18,11 @@ import com.chiefofstaff.core.AppLog
  * visible ongoing notification on a MIN-importance channel so it stays unobtrusive (RES-05: no
  * counts, no red). It does no work itself — the rituals run as WorkManager jobs.
  */
-class RitualForegroundService : LifecycleService() {
+class RitualForegroundService : Service() {
 
-    override fun onBind(intent: Intent): IBinder? {
-        super.onBind(intent)
-        return null
-    }
+    override fun onBind(intent: Intent): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        super.onStartCommand(intent, flags, startId)
         startForegroundCompat()
         return START_STICKY
     }

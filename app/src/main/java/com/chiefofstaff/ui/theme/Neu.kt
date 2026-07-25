@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
  * hold-to-talk button while held).
  */
 fun Modifier.neuSurface(
-    cornerRadius: Dp = 20.dp,
+    cornerRadius: Int = 20,          // dp; kept as Int so call sites read cleanly (neuSurface(cornerRadius = 22))
     fill: Color = Palette.Surface,
     light: Color = Palette.ShadowLight,
     dark: Color = Palette.ShadowDark,
@@ -29,7 +29,7 @@ fun Modifier.neuSurface(
     pressed: Boolean = false,
 ): Modifier = this
     .drawBehind {
-        val radiusPx = cornerRadius.toPx()
+        val radiusPx = cornerRadius.dp.toPx()
         val blur = elevation.toPx()
         val offset = (elevation.toPx()) * 0.7f
         val dir = if (pressed) -1f else 1f
@@ -41,7 +41,7 @@ fun Modifier.neuSurface(
             softShadow(canvas, light, Offset(-offset * dir, -offset * dir), blur, radiusPx, size.width, size.height)
         }
     }
-    .background(color = fill, shape = RoundedCornerShape(cornerRadius))
+    .background(color = fill, shape = RoundedCornerShape(cornerRadius.dp))
 
 private fun softShadow(
     canvas: androidx.compose.ui.graphics.Canvas,
