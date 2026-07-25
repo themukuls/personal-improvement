@@ -176,10 +176,13 @@ class LookViewModel(private val container: AppContainer) : ViewModel() {
                 val last = p.lastContact
                 val days = last?.let { java.time.Duration.between(it, now).toDays() }
                 val overdue = cadence != null && days != null && days > cadence
+                // MEM-12 — most recent interaction summary, inline.
+                val lastInteraction = container.repo.graph.interactionsFor(p.id).first().firstOrNull()?.summary
                 val sub = buildString {
                     p.relationship?.let { append(it) }
                     if (days != null) { if (isNotEmpty()) append(" · "); append("last $days d ago") }
                     if (cadence != null) { if (isNotEmpty()) append(" · "); append("every $cadence d") }
+                    if (!lastInteraction.isNullOrBlank()) { if (isNotEmpty()) append(" · "); append(lastInteraction) }
                 }
                 PeopleRow(p.id, p.name, sub, overdue)
             }
@@ -255,6 +258,11 @@ class LookViewModel(private val container: AppContainer) : ViewModel() {
             container.reductionEngine.declareBankruptcy(domain)
             loadReduction()
         }
+    }
+
+    /** ACC-14 — bulk-reschedule everything due today to tomorrow. */
+    fun rescheduleTomorrow() {
+        viewModelScope.launch { container.repo.rescheduleTodayToTomorrow(); loadReduction() }
     }
 
     /** INT-08 — enable quiet mode for [days] days (24h or 7d), or clear it. */

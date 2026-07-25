@@ -123,6 +123,7 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
                             onLogContact = lookVm::logContact,
                             onSetMode = lookVm::setMode,
                             onRecordOutcome = lookVm::recordDecisionOutcome,
+                            onReschedule = lookVm::rescheduleTomorrow,
                         )
                     }
                 }

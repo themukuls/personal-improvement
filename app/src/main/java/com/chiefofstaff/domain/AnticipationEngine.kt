@@ -45,6 +45,8 @@ class AnticipationEngine(
             addAll(overloadForecast())
             addAll(financialCalendar())
             addAll(decisionAudit())
+            addAll(streakBreakRisk())
+            addAll(trendInflection())
         }
         val winner = candidates.maxByOrNull { it.salience } ?: return null
 
@@ -162,6 +164,48 @@ class AnticipationEngine(
                 salience = (0.7f + (dueNextWeek - 12) * 0.01f).coerceAtMost(0.9f),
             )
         )
+    }
+
+    // ANT-07 — streak-break risk: three short nights running, with an early start tomorrow.
+    private suspend fun streakBreakRisk(): List<Candidate> {
+        val sleep = repo.graph.observations("sleep_minutes", 3)
+        if (sleep.size < 3 || sleep.any { it.value >= 360 }) return emptyList()   // all under 6h
+        val tomorrowStart = clock.today().plusDays(1).atStartOfDay(clock.zone()).toInstant()
+        val earlyCutoff = clock.today().plusDays(1).atTime(8, 0).atZone(clock.zone()).toInstant()
+        val hasEarly = repo.commitments.openCommitmentsNow().any { c ->
+            val due = c.dueAt ?: return@any false
+            !due.isBefore(tomorrowStart) && !due.isAfter(earlyCutoff)
+        }
+        if (!hasEarly) return emptyList()
+        return listOf(
+            Candidate(
+                kind = AnticipationKind.STREAK_BREAK,
+                headline = "Three short nights before an early start.",
+                detail = "You have an early commitment tomorrow on little sleep — plan a soft landing.",
+                salience = 0.72f,
+            )
+        )
+    }
+
+    // ANT-08 — trend inflection: a health metric that has changed direction and sustained it.
+    private suspend fun trendInflection(): List<Candidate> {
+        return listOf("weight_kg", "steps").flatMap { metric ->
+            val obs = repo.graph.observations(metric, 6)
+            if (obs.size < 6) return@flatMap emptyList()
+            val recent = obs.take(3).map { it.value }.average()
+            val prior = obs.drop(3).take(3).map { it.value }.average()
+            val base = if (prior != 0.0) prior else 1.0
+            if (kotlin.math.abs(recent - prior) / base < 0.05) return@flatMap emptyList()
+            val dir = if (recent > prior) "up" else "down"
+            listOf(
+                Candidate(
+                    kind = AnticipationKind.TREND_INFLECTION,
+                    headline = "Your ${metric.replace('_', ' ')} is trending $dir.",
+                    detail = "A sustained change over recent readings — worth a glance.",
+                    salience = 0.55f,
+                )
+            )
+        }
     }
 
     // REV-08 — a decision made 90+ days ago whose outcome was never recorded.

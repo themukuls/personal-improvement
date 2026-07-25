@@ -53,6 +53,7 @@ fun LookScreen(
     onLogContact: (Long) -> Unit,
     onSetMode: (Mode) -> Unit,
     onRecordOutcome: (Long) -> Unit,
+    onReschedule: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -205,6 +206,9 @@ fun LookScreen(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (state.domainCounts.isEmpty()) {
                     Text("Nothing open. Domains fill as you go.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+                } else {
+                    // ACC-14 — bulk renegotiation.
+                    Row { QuietChip("Push today → tomorrow") { onReschedule() } }
                 }
                 // RES-02 — per-domain backlog with one-action bankruptcy.
                 state.domainCounts.forEach { (domain, count) ->

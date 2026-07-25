@@ -43,6 +43,17 @@ class LifeRepository(
     // --- Now-screen reactive reads ---
     fun openCommitments(): Flow<List<Commitment>> = commitments.openCommitments()
 
+    // ACC-14 — commitment renegotiation: bulk-push everything due today to tomorrow, same time.
+    suspend fun rescheduleTodayToTomorrow(): Int {
+        val endOfToday = clock.today().atTime(23, 59).atZone(clock.zone()).toInstant()
+        val now = clock.now()
+        val due = commitments.openCommitmentsNow().filter { c -> c.dueAt?.let { !it.isAfter(endOfToday) } == true }
+        due.forEach { c ->
+            commitments.update(c.copy(dueAt = c.dueAt!!.plusSeconds(86_400), updatedAt = now, lastTouchedAt = now))
+        }
+        return due.size
+    }
+
     // MEM-11 / ACC-11 — the waiting-on register: what others owe you, and chasing it.
     fun openWaiting(): Flow<List<com.chiefofstaff.data.entity.WaitingOn>> = commitments.openWaiting()
 
