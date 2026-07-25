@@ -1,5 +1,6 @@
 package com.chiefofstaff.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,6 +52,7 @@ fun NowScreen(
     onToggle: (NowItem) -> Unit,
     onAddCommitment: () -> Unit,
     onAnticipationRated: (Boolean) -> Unit,
+    onSetEnergy: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -66,6 +68,12 @@ fun NowScreen(
         Text(state.dateTitle, style = MaterialTheme.typography.headlineMedium, color = Palette.Ink)
         Spacer(Modifier.height(6.dp))
         Text(state.statusLine, style = Mono.Status, color = Palette.InkFaint)
+
+        // CAP-10 — one-gesture daily energy, shown only until it's set (progressive; P9).
+        if (state.energyToday == null && !state.loading) {
+            Spacer(Modifier.height(16.dp))
+            EnergyTap(onSetEnergy)
+        }
 
         // RIGHT NOW — the one borrowed idea from 1c.
         if (!state.rightNow.isNullOrBlank()) {
@@ -118,6 +126,28 @@ fun NowScreen(
             }
         }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun EnergyTap(onSetEnergy: (Int) -> Unit) {
+    Column {
+        SectionLabel("HOW'S YOUR ENERGY?")
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            (1..5).forEach { level ->
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .neuSurface(cornerRadius = 17, elevation = 5.dp)
+                        .clip(CircleShape)
+                        .clickable { onSetEnergy(level) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("$level", style = Mono.Time, color = Palette.InkMuted)
+                }
+            }
+        }
     }
 }
 

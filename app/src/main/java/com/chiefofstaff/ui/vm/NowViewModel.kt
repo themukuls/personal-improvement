@@ -32,6 +32,7 @@ data class NowUiState(
     val anticipation: AnticipationItem? = null,
     val today: List<NowItem> = emptyList(),
     val notToday: List<String> = emptyList(),
+    val energyToday: Int? = null,
     val loading: Boolean = true,
 )
 
@@ -48,7 +49,8 @@ class NowViewModel(private val container: AppContainer) : ViewModel() {
         repo.openCommitments(),
         repo.modeFlow(),
         repo.state.topAnticipationFlow(DayState.keyFor(clock.today())),
-    ) { commitments, mode, anticipation ->
+        repo.todayFlow(),
+    ) { commitments, mode, anticipation, day ->
         val zone = clock.zone()
         val today = clock.today()
         val dateTitle = "${today.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())}, " +
@@ -77,6 +79,7 @@ class NowViewModel(private val container: AppContainer) : ViewModel() {
             anticipation = anticipation,
             today = rows,
             notToday = violations.map { it.explanation },
+            energyToday = day?.energy,
             loading = false,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NowUiState())
@@ -86,6 +89,11 @@ class NowViewModel(private val container: AppContainer) : ViewModel() {
             val verdict = if (item.checked) return@launch else Verdict.DONE
             container.stateMachine.applyVerdict(item.id, verdict)
         }
+    }
+
+    /** CAP-10 — one-gesture daily energy (1–5). Feeds minimum-viable-day + energy-aware scheduling. */
+    fun setEnergy(level: Int) {
+        viewModelScope.launch { repo.setEnergy(level) }
     }
 
     fun dismissAnticipation(useful: Boolean) {

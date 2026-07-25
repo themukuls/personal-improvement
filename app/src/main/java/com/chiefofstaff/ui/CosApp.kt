@@ -92,6 +92,7 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
                             onToggle = nowVm::toggleDone,
                             onAddCommitment = { current = Destination.Talk },
                             onAnticipationRated = nowVm::dismissAnticipation,
+                            onSetEnergy = nowVm::setEnergy,
                         )
                     }
                     Destination.Talk -> {

@@ -83,6 +83,9 @@ dependencies {
     // Background (SYS-08)
     implementation(libs.androidx.work.runtime.ktx)
 
+    // Passive capture — Health Connect (CAP-07, DOM-01/02/05)
+    implementation(libs.androidx.health.connect)
+
     // Secure key storage for the SQLCipher passphrase
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.datastore.preferences)

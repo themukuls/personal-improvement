@@ -37,6 +37,7 @@ class EveningCloseWorker(c: Context, p: WorkerParameters) : ContainerWorker(c, p
 class NightlyBatchWorker(c: Context, p: WorkerParameters) : ContainerWorker(c, p) {
     override suspend fun doWork(): Result = runCatching {
         with(container) {
+            runCatching { healthConnectSync.sync() }   // CAP-07 passive health pull
             extractionPipeline.processBacklog()
             anticipationEngine.runNightlyScan()
             val archived = stateMachine.autoArchiveDormant()
