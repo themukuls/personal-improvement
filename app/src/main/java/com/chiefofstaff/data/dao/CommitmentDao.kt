@@ -67,6 +67,10 @@ interface CommitmentDao {
     @Query("SELECT COUNT(*) FROM commitment WHERE state = 'DONE' AND updatedAt >= :since")
     suspend fun doneCountSince(since: Long): Int
 
+    /** REV-05 — commitments touched in a window, for the per-domain scorecard. */
+    @Query("SELECT * FROM commitment WHERE updatedAt >= :since")
+    suspend fun changedSince(since: Long): List<Commitment>
+
     @Query("SELECT COUNT(*) FROM commitment WHERE state IN ('DONE','SKIPPED','DROPPED') AND updatedAt >= :since")
     suspend fun resolvedCountSince(since: Long): Int
 

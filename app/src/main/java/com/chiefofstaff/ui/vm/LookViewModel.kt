@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chiefofstaff.AppContainer
 import com.chiefofstaff.data.entity.Capture
+import com.chiefofstaff.data.model.CommitmentState
 import com.chiefofstaff.data.model.Domain
 import com.chiefofstaff.data.model.Mode
 import com.chiefofstaff.domain.ReductionEngine
@@ -13,7 +14,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.Duration
 
-enum class LookSection { DIRECTION, TIMELINE, TRENDS, DOMAINS, WAITING, PEOPLE, DECISIONS, REFERENCES }
+enum class LookSection { DIRECTION, TIMELINE, TRENDS, DOMAINS, WAITING, PEOPLE, DECISIONS, REFERENCES, CONVERSATIONS }
 
 data class LookUiState(
     val query: String = "",
@@ -43,6 +44,10 @@ data class LookUiState(
     val valueLines: List<String> = emptyList(),
     val goalLines: List<String> = emptyList(),
     val projectLines: List<String> = emptyList(),
+    // REV-05 domain scorecard · SYS-17 token dashboard · CNV-12 session history.
+    val scorecard: List<String> = emptyList(),
+    val tokensLine: String? = null,
+    val sessions: List<String> = emptyList(),
 )
 
 data class ReferenceRow(val label: String, val value: String, val sub: String, val emergency: Boolean)
@@ -89,6 +94,7 @@ class LookViewModel(private val container: AppContainer) : ViewModel() {
             LookSection.PEOPLE -> loadPeople()
             LookSection.REFERENCES -> loadReferences()
             LookSection.DIRECTION -> loadDirection()
+            LookSection.CONVERSATIONS -> loadSessions()
             else -> Unit
         }
     }
@@ -254,8 +260,34 @@ class LookViewModel(private val container: AppContainer) : ViewModel() {
                     add("Sleep: ${(it.value / 60).toInt()}h ${(it.value % 60).toInt()}m")
                 }
                 container.repo.graph.observations("weight_kg", 1).firstOrNull()?.let { add("Weight: ${"%.1f".format(it.value)} kg") }
+                container.repo.graph.observations("screen_minutes", 1).firstOrNull()?.let { add("Screen: ${(it.value / 60).toInt()}h ${(it.value % 60).toInt()}m") }
             }
-            _state.value = _state.value.copy(consistencyPct = pct, predictionAccuracyHours = mae, healthLines = health)
+            // REV-05 — per-domain done/total over 30 days.
+            val since = container.clock.today().minusDays(30).atStartOfDay(container.clock.zone()).toInstant().toEpochMilli()
+            val resolved = container.repo.commitments.changedSince(since)
+                .filter { it.state == CommitmentState.DONE || it.state == CommitmentState.SKIPPED || it.state == CommitmentState.DROPPED }
+            val scorecard = resolved.groupBy { it.domain }.filterKeys { it != Domain.NONE }.map { (d, list) ->
+                val done = list.count { it.state == CommitmentState.DONE }
+                "${d.name.lowercase().replaceFirstChar { c -> c.uppercase() }} $done/${list.size}"
+            }
+            // SYS-17 — token spend today.
+            val tokens = "tokens today: ${container.costTracker.todayInputTokens()} in / ${container.costTracker.todayOutputTokens()} out"
+            _state.value = _state.value.copy(
+                consistencyPct = pct, predictionAccuracyHours = mae, healthLines = health,
+                scorecard = scorecard, tokensLine = tokens,
+            )
+        }
+    }
+
+    /** CNV-12 — searchable session history (recent conversations). */
+    private fun loadSessions() {
+        viewModelScope.launch {
+            val zone = container.clock.zone()
+            val rows = container.repo.conversation.sessions().first().take(30).map { s ->
+                val t = java.time.LocalDateTime.ofInstant(s.startedAt, zone)
+                "%02d/%02d %02d:%02d · %s".format(t.dayOfMonth, t.monthValue, t.hour, t.minute, s.mode.name.lowercase())
+            }
+            _state.value = _state.value.copy(sessions = rows)
         }
     }
 

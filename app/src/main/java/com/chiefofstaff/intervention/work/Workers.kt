@@ -38,6 +38,8 @@ class NightlyBatchWorker(c: Context, p: WorkerParameters) : ContainerWorker(c, p
     override suspend fun doWork(): Result = runCatching {
         with(container) {
             runCatching { healthConnectSync.sync() }   // CAP-07 passive health pull
+            runCatching { screenTimeSync.sync() }      // CAP-09 passive screen-time
+            runCatching { insightEngine.computeAndStoreDayLoad() }  // RES-07 load score
             extractionPipeline.processBacklog()
             anticipationEngine.runNightlyScan()
             val archived = stateMachine.autoArchiveDormant()

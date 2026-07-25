@@ -8,6 +8,8 @@ import com.chiefofstaff.capture.CaptureManager
 import com.chiefofstaff.capture.FactExtractionPipeline
 import com.chiefofstaff.capture.FactWriter
 import com.chiefofstaff.capture.HealthConnectSync
+import com.chiefofstaff.capture.MealEstimator
+import com.chiefofstaff.capture.ScreenTimeSync
 import com.chiefofstaff.core.Clock
 import com.chiefofstaff.core.SystemClock
 import com.chiefofstaff.data.CoSDatabase
@@ -112,6 +114,8 @@ class AppContainer(context: Context) {
     val captureManager: CaptureManager by lazy { CaptureManager(repo, extractionPipeline, appScope, ::isOnline) }
     val calendarSync: CalendarSync by lazy { CalendarSync(appContext, repo, clock) }
     val healthConnectSync: HealthConnectSync by lazy { HealthConnectSync(appContext, repo, clock) }
+    val screenTimeSync: ScreenTimeSync by lazy { ScreenTimeSync(appContext, repo, clock) }
+    val mealEstimator: MealEstimator by lazy { MealEstimator(repo, clock, orchestrator) }
 
     // --- Intervention ---
     val notificationBudget: NotificationBudget by lazy { NotificationBudget(appContext, repo, clock) }

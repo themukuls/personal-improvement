@@ -166,6 +166,15 @@ fun LookScreen(
                     if (pct != null) TrendLine("Consistency", "$pct% over 30 days")
                     if (mae != null) TrendLine("Self-accuracy", "estimates off by ~${"%.1f".format(mae)}h")
                     state.healthLines.forEach { TrendLine(it.substringBefore(":"), it.substringAfter(": ")) }
+                    if (state.scorecard.isNotEmpty()) {
+                        Spacer(Modifier.height(4.dp))
+                        SectionLabel("DOMAIN SCORECARD")
+                        state.scorecard.forEach { TrendLine(it.substringBeforeLast(' '), it.substringAfterLast(' ')) }
+                    }
+                    state.tokensLine?.let {
+                        Spacer(Modifier.height(4.dp))
+                        Text(it, style = Mono.Status, color = Palette.InkGhost)
+                    }
                 }
             }
         }
@@ -274,6 +283,15 @@ fun LookScreen(
                             Text(r.sub, style = Mono.Status, color = Palette.InkFaint)
                         }
                     }
+                }
+            }
+        }
+        CollapsedSection("CONVERSATIONS", LookSection.CONVERSATIONS, state, onToggleSection) {
+            if (state.sessions.isEmpty()) {
+                Text("Past conversations are searchable here.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    state.sessions.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted) }
                 }
             }
         }

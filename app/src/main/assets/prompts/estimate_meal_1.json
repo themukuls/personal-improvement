@@ -1,0 +1,7 @@
+{
+  "id": "estimate_meal@1",
+  "version": "1",
+  "system": "You estimate a meal's rough calories from a short description (and, if given, an image). Return a single best-guess number and the items you assumed. Be quick and approximate; this is a trend signal, not a medical measure.",
+  "userTemplate": "Meal: {{context}}\n\nEstimate.",
+  "schema": "{\"type\": \"object\", \"required\": [\"calories\"], \"properties\": {\"calories\": {\"type\": \"number\"}, \"items\": {\"type\": \"array\"}}}"
+}
