@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.Duration
 
-enum class LookSection { TIMELINE, TRENDS, DOMAINS, WAITING, PEOPLE, DECISIONS, REFERENCES }
+enum class LookSection { DIRECTION, TIMELINE, TRENDS, DOMAINS, WAITING, PEOPLE, DECISIONS, REFERENCES }
 
 data class LookUiState(
     val query: String = "",
@@ -36,6 +36,10 @@ data class LookUiState(
     val people: List<PeopleRow> = emptyList(),
     // FDN-07/08 — reference vault + emergency card.
     val references: List<ReferenceRow> = emptyList(),
+    // FDN-02/03 — value → goal → project tree.
+    val valueLines: List<String> = emptyList(),
+    val goalLines: List<String> = emptyList(),
+    val projectLines: List<String> = emptyList(),
 )
 
 data class ReferenceRow(val label: String, val value: String, val sub: String, val emergency: Boolean)
@@ -81,7 +85,26 @@ class LookViewModel(private val container: AppContainer) : ViewModel() {
             LookSection.WAITING -> loadWaiting()
             LookSection.PEOPLE -> loadPeople()
             LookSection.REFERENCES -> loadReferences()
+            LookSection.DIRECTION -> loadDirection()
             else -> Unit
+        }
+    }
+
+    /** FDN-02/03 — the value → goal → project spine that makes prioritisation non-arbitrary. */
+    private fun loadDirection() {
+        viewModelScope.launch {
+            val values = container.repo.graph.values().first()
+                .sortedBy { it.rank }.map { "${it.rank}. ${it.statement}" }
+            val goals = container.repo.graph.activeGoals().first().map { g ->
+                buildString {
+                    append("${g.horizon}: ${g.title}")
+                    g.metric?.let { append(" (").append(it); g.target?.let { t -> append(" → ").append(t) }; append(")") }
+                }
+            }
+            val projects = container.repo.graph.activeProjects().first().map { p ->
+                p.outcome?.let { "${p.title} → $it" } ?: p.title
+            }
+            _state.value = _state.value.copy(valueLines = values, goalLines = goals, projectLines = projects)
         }
     }
 

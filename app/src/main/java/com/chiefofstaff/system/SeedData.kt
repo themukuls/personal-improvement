@@ -49,6 +49,31 @@ class SeedData(
             )
         )
 
+        // FDN-02/03 — a small value → goal → project spine.
+        val valueId = repo.graph.insertValue(
+            com.chiefofstaff.data.entity.ValueStatement(
+                statement = "Be someone my body and my team can rely on", rank = 1, createdAt = now,
+            )
+        )
+        val workGoalId = repo.graph.insertGoal(
+            com.chiefofstaff.data.entity.Goal(
+                title = "Ship the Q3 capacity plan", horizon = "month", domain = Domain.WORK,
+                parentValueId = valueId, createdAt = now, lastTouchedAt = now,
+            )
+        )
+        repo.graph.insertGoal(
+            com.chiefofstaff.data.entity.Goal(
+                title = "Rebuild baseline fitness", horizon = "quarter", domain = Domain.HEALTH,
+                metric = "gym sessions/week", target = "4", parentValueId = valueId, createdAt = now, lastTouchedAt = now,
+            )
+        )
+        repo.graph.insertProject(
+            com.chiefofstaff.data.entity.Project(
+                title = "Q3 capacity planning", outcome = "Signed-off plan with Rakesh",
+                domain = Domain.WORK, parentGoalId = workGoalId, createdAt = now, lastTouchedAt = now,
+            )
+        )
+
         // Today's calendar (status line: "next 10:00 standup").
         repo.graph.upsertEvent(
             EventEntity(title = "Standup", start = at(10, 0), end = at(10, 15), source = "seed", externalId = "seed-standup", createdAt = now)

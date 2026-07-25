@@ -100,6 +100,26 @@ fun LookScreen(
         }
 
         Spacer(Modifier.height(20.dp))
+        CollapsedSection("DIRECTION", LookSection.DIRECTION, state, onToggleSection) {
+            if (state.valueLines.isEmpty() && state.goalLines.isEmpty() && state.projectLines.isEmpty()) {
+                Text("Your values, goals and projects form here.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (state.valueLines.isNotEmpty()) {
+                        SectionLabel("VALUES")
+                        state.valueLines.forEach { Text(it, style = MaterialTheme.typography.bodyLarge, color = Palette.Ink) }
+                    }
+                    if (state.goalLines.isNotEmpty()) {
+                        SectionLabel("GOALS")
+                        state.goalLines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted) }
+                    }
+                    if (state.projectLines.isNotEmpty()) {
+                        SectionLabel("PROJECTS")
+                        state.projectLines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted) }
+                    }
+                }
+            }
+        }
         CollapsedSection("TIMELINE", LookSection.TIMELINE, state, onToggleSection) {
             if (state.timeline.isEmpty()) Text("No captures yet.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
             else state.timeline.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted, modifier = Modifier.padding(vertical = 3.dp)) }
