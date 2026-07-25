@@ -1,6 +1,8 @@
 package com.chiefofstaff.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,9 +21,11 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.chiefofstaff.data.model.Domain
+import com.chiefofstaff.data.model.Mode
 import com.chiefofstaff.domain.ReductionEngine
 import com.chiefofstaff.ui.components.NeuCard
 import com.chiefofstaff.ui.components.SectionLabel
@@ -47,6 +51,7 @@ fun LookScreen(
     onChase: (Long) -> Unit,
     onResolveWaiting: (Long) -> Unit,
     onLogContact: (Long) -> Unit,
+    onSetMode: (Mode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -95,6 +100,33 @@ fun LookScreen(
                     QuietChip("24h") { onSetQuiet(1) }
                     QuietChip("7 days") { onSetQuiet(7) }
                     QuietChip("Off") { onSetQuiet(null) }
+                }
+            }
+        }
+
+        // DIR-09 — operating mode; shapes the plan and notification posture.
+        Spacer(Modifier.height(12.dp))
+        NeuCard(modifier = Modifier.fillMaxWidth()) {
+            Column {
+                SectionLabel("MODE")
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Mode.entries.forEach { mode ->
+                        val active = mode == state.currentMode
+                        Text(
+                            text = mode.name.lowercase().replace('_', ' '),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (active) Palette.Ink else Palette.InkFaint,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .then(if (active) Modifier.neuSurface(cornerRadius = 14, elevation = 5.dp, pressed = true) else Modifier)
+                                .clickable { onSetMode(mode) }
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                        )
+                    }
                 }
             }
         }

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.chiefofstaff.AppContainer
 import com.chiefofstaff.data.entity.Capture
 import com.chiefofstaff.data.model.Domain
+import com.chiefofstaff.data.model.Mode
 import com.chiefofstaff.domain.ReductionEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +26,8 @@ data class LookUiState(
     val healthLines: List<String> = emptyList(),
     // INT-08 — quiet mode state.
     val quietActive: Boolean = false,
+    // DIR-09 — operating mode.
+    val currentMode: Mode = Mode.NORMAL,
     // RES-02/04 — anti-burden.
     val proposals: List<ReductionEngine.ReductionItem> = emptyList(),
     val domainCounts: Map<Domain, Int> = emptyMap(),
@@ -230,10 +233,15 @@ class LookViewModel(private val container: AppContainer) : ViewModel() {
 
     private fun refreshQuiet() {
         viewModelScope.launch {
-            val until = container.repo.mode().quietUntil
-            val active = until != null && container.clock.now().isBefore(until)
-            _state.value = _state.value.copy(quietActive = active)
+            val mode = container.repo.mode()
+            val active = mode.quietUntil != null && container.clock.now().isBefore(mode.quietUntil)
+            _state.value = _state.value.copy(quietActive = active, currentMode = mode.current)
         }
+    }
+
+    /** DIR-09 — switch operating mode; affects plan shape (sick/recovery reduce the day). */
+    fun setMode(mode: Mode) {
+        viewModelScope.launch { container.repo.setMode(mode); refreshQuiet() }
     }
 
     private fun loadTrends() {

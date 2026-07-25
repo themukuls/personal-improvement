@@ -36,9 +36,12 @@ class PlanGenerator(
     /** P7 — the plan proposes 3–6 items; DIR-04 reduces to 1 on a low-energy or high-load day. */
     suspend fun generate(maxItems: Int = 6): Plan {
         val day = repo.today()
+        val mode = repo.mode().current
         val lowEnergy = (day.energy ?: 3) <= 2
         val highLoad = (day.loadScore ?: 0f) >= 0.8f
-        val minimumViable = lowEnergy || highLoad || day.illnessFlag
+        // DIR-09 — sick/recovery modes reduce the day to a single item, like a low-energy day.
+        val recoveryMode = mode == com.chiefofstaff.data.model.Mode.SICK || mode == com.chiefofstaff.data.model.Mode.RECOVERY
+        val minimumViable = lowEnergy || highLoad || day.illnessFlag || recoveryMode
         val cap = if (minimumViable) 1 else maxItems
 
         val open = repo.commitments.openCommitments().first()

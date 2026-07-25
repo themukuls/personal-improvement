@@ -121,6 +121,7 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
                             onChase = lookVm::chase,
                             onResolveWaiting = lookVm::resolveWaiting,
                             onLogContact = lookVm::logContact,
+                            onSetMode = lookVm::setMode,
                         )
                     }
                 }
