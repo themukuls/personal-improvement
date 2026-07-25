@@ -124,6 +124,20 @@ class AppContainer(context: Context) {
     val backup: Backup by lazy { Backup(appContext, repo, clock) }
     val silentFailureDetector: SilentFailureDetector by lazy { SilentFailureDetector(repo, clock, notifier) }
 
+    /**
+     * RES-03 — days since the app was last opened, computed once at startup, then the marker is
+     * advanced to now. Drives the gentle re-entry flow: after an absence the app welcomes you back
+     * and shows only today, never a backlog dump.
+     */
+    val daysAway: Int by lazy {
+        val prefs = appContext.getSharedPreferences("cos_flags", Context.MODE_PRIVATE)
+        val last = prefs.getLong("last_opened", 0L)
+        val now = clock.epochMillis()
+        val days = if (last == 0L) 0 else ((now - last) / 86_400_000L).toInt()
+        prefs.edit().putLong("last_opened", now).apply()
+        days
+    }
+
     private fun isOnline(): Boolean {
         val cm = appContext.getSystemService(ConnectivityManager::class.java) ?: return false
         val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false

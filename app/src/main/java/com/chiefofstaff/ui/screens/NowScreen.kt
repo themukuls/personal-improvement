@@ -21,6 +21,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,6 +59,7 @@ fun NowScreen(
     onSetEnergy: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var reentryDismissed by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -68,6 +73,24 @@ fun NowScreen(
         Text(state.dateTitle, style = MaterialTheme.typography.headlineMedium, color = Palette.Ink)
         Spacer(Modifier.height(6.dp))
         Text(state.statusLine, style = Mono.Status, color = Palette.InkFaint)
+
+        // RES-03 — re-entry after an absence: welcome back, no shame, no backlog dump.
+        if (state.reentryDays >= 3 && !reentryDismissed) {
+            Spacer(Modifier.height(16.dp))
+            NeuCard(modifier = Modifier.fillMaxWidth()) {
+                Column {
+                    SectionLabel("WELCOME BACK")
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "It's been ${state.reentryDays} days. I kept things quiet — here's just today, nothing to catch up on.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Palette.InkMuted,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    GhostButton(text = "Thanks", onClick = { reentryDismissed = true })
+                }
+            }
+        }
 
         // CAP-10 — one-gesture daily energy, shown only until it's set (progressive; P9).
         if (state.energyToday == null && !state.loading) {
@@ -153,23 +176,32 @@ private fun EnergyTap(onSetEnergy: (Int) -> Unit) {
 
 @Composable
 private fun TopRow() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        GradientDot(sizeDp = 34)
-        Spacer(Modifier.weight(1f))
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .neuSurface(cornerRadius = 17, elevation = 6.dp)
-                .clip(CircleShape),
-            contentAlignment = Alignment.Center,
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Outlined.History, contentDescription = "History", tint = Palette.InkMuted, modifier = Modifier.size(18.dp))
+            GradientDot(sizeDp = 34)
+            Spacer(Modifier.weight(1f))
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .neuSurface(cornerRadius = 17, elevation = 6.dp)
+                    .clip(CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Outlined.History, contentDescription = "History", tint = Palette.InkMuted, modifier = Modifier.size(18.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            GradientDot(sizeDp = 34)
         }
-        Spacer(Modifier.width(12.dp))
-        GradientDot(sizeDp = 34)
+        // App wordmark, centered between the avatars.
+        Text(
+            text = "Chief of Staff",
+            style = MaterialTheme.typography.labelLarge,
+            color = Palette.InkMuted,
+            modifier = Modifier.align(Alignment.Center),
+        )
     }
 }
 

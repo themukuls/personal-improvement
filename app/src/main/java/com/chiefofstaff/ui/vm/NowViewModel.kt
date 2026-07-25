@@ -33,6 +33,7 @@ data class NowUiState(
     val today: List<NowItem> = emptyList(),
     val notToday: List<String> = emptyList(),
     val energyToday: Int? = null,
+    val reentryDays: Int = 0,
     val loading: Boolean = true,
 )
 
@@ -80,6 +81,7 @@ class NowViewModel(private val container: AppContainer) : ViewModel() {
             today = rows,
             notToday = violations.map { it.explanation },
             energyToday = day?.energy,
+            reentryDays = container.daysAway,
             loading = false,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NowUiState())
