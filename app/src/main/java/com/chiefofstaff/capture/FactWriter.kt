@@ -10,6 +10,7 @@ import com.chiefofstaff.data.entity.EventEntity
 import com.chiefofstaff.data.entity.Interaction
 import com.chiefofstaff.data.entity.Note
 import com.chiefofstaff.data.entity.Observation
+import com.chiefofstaff.data.entity.Occasion
 import com.chiefofstaff.data.entity.Person
 import com.chiefofstaff.data.entity.Project
 import com.chiefofstaff.data.entity.ReferenceItem
@@ -180,6 +181,24 @@ class FactWriter(
                     )
                 ); true
             }
+            "occasion" -> {
+                // DOM-16 — a recurring date for a person (birthday/anniversary/follow_up).
+                val who = fact.str("who") ?: fact.str("name") ?: return false
+                val md = fact.str("date")?.let { parseMonthDay(it) } ?: return false
+                val occKind = fact.str("kind")?.lowercase()?.takeIf {
+                    it in setOf("birthday", "anniversary", "follow_up")
+                } ?: "birthday"
+                if (repo.graph.findOccasion(who, occKind) == null) {
+                    repo.graph.insertOccasion(
+                        Occasion(
+                            personName = who, kind = occKind,
+                            month = md.first, day = md.second,
+                            note = fact.str("note"), createdAt = now,
+                        )
+                    )
+                }
+                true
+            }
             "note" -> {
                 repo.graph.insertNote(Note(text = fact.str("text") ?: return false, createdAt = now)); true
             }
@@ -212,6 +231,26 @@ class FactWriter(
     private fun parseTimeToday(raw: String): java.time.Instant? {
         val t = parseLocalTime(raw) ?: return null
         return clock.today().atTime(t).atZone(clock.zone()).toInstant()
+    }
+
+    /** Parse "2026-03-10", "03-10", or "March 10" / "10 March" into (month, day); else null. */
+    private fun parseMonthDay(raw: String): Pair<Int, Int>? {
+        val s = raw.trim().lowercase()
+        Regex("""(\d{4})-(\d{1,2})-(\d{1,2})""").find(s)?.let {
+            return it.groupValues[2].toInt() to it.groupValues[3].toInt()
+        }
+        Regex("""^(\d{1,2})-(\d{1,2})$""").find(s)?.let {
+            return it.groupValues[1].toInt() to it.groupValues[2].toInt()
+        }
+        val months = listOf(
+            "january", "february", "march", "april", "may", "june",
+            "july", "august", "september", "october", "november", "december",
+        )
+        val monthIdx = months.indexOfFirst { s.contains(it.take(3)) }
+        if (monthIdx >= 0) {
+            Regex("""(\d{1,2})""").find(s)?.let { return (monthIdx + 1) to it.groupValues[1].toInt() }
+        }
+        return null
     }
 
     /** Parse an ISO date ("2026-08-15") into an Instant at start of day; unknown formats yield null. */

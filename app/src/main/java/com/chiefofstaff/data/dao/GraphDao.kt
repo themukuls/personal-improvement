@@ -10,6 +10,7 @@ import com.chiefofstaff.data.entity.EventEntity
 import com.chiefofstaff.data.entity.Goal
 import com.chiefofstaff.data.entity.Interaction
 import com.chiefofstaff.data.entity.Note
+import com.chiefofstaff.data.entity.Occasion
 import com.chiefofstaff.data.entity.Person
 import com.chiefofstaff.data.entity.Project
 import com.chiefofstaff.data.entity.Observation
@@ -93,4 +94,10 @@ interface GraphDao {
     // Notes.
     @Insert suspend fun insertNote(n: Note): Long
     @Query("SELECT * FROM note ORDER BY createdAt DESC") fun notes(): Flow<List<Note>>
+
+    // Occasions (DOM-16 — recurring dates per person).
+    @Insert suspend fun insertOccasion(o: Occasion): Long
+    @Query("SELECT * FROM occasion ORDER BY month, day") suspend fun allOccasions(): List<Occasion>
+    @Query("SELECT * FROM occasion WHERE personName = :name AND kind = :kind LIMIT 1")
+    suspend fun findOccasion(name: String, kind: String): Occasion?
 }

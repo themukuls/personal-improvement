@@ -47,6 +47,7 @@ class AnticipationEngine(
             addAll(decisionAudit())
             addAll(streakBreakRisk())
             addAll(trendInflection())
+            addAll(upcomingOccasions())
         }
         val winner = candidates.maxByOrNull { it.salience } ?: return null
 
@@ -239,5 +240,38 @@ class AnticipationEngine(
                 relatedId = c.id,
             )
         }
+    }
+
+    // DOM-16 — a birthday / anniversary / promised follow-up landing in the next 10 days.
+    private suspend fun upcomingOccasions(): List<Candidate> {
+        val today = clock.today()
+        return repo.graph.allOccasions().mapNotNull { o ->
+            val days = daysUntilNext(o.month, o.day, today) ?: return@mapNotNull null
+            if (days > 10) return@mapNotNull null
+            val whenTxt = when (days) { 0L -> "today"; 1L -> "tomorrow"; else -> "in $days days" }
+            val label = when (o.kind) {
+                "birthday" -> "${o.personName}'s birthday is $whenTxt."
+                "anniversary" -> "${o.personName}'s anniversary is $whenTxt."
+                else -> "You promised ${o.personName} a follow-up — $whenTxt."
+            }
+            Candidate(
+                kind = AnticipationKind.OCCASION,
+                headline = label,
+                detail = o.note ?: "A small gesture now beats a late one.",
+                salience = (0.72f + (1f - days / 10f) * 0.18f).coerceIn(0f, 0.9f),
+            )
+        }
+    }
+
+    /** Days from [from] until the next annual occurrence of month/day, clamped to valid dates. */
+    private fun daysUntilNext(month: Int, day: Int, from: java.time.LocalDate): Long? {
+        if (month !in 1..12 || day !in 1..31) return null
+        fun occurrenceIn(year: Int): java.time.LocalDate {
+            val len = java.time.YearMonth.of(year, month).lengthOfMonth()
+            return java.time.LocalDate.of(year, month, day.coerceAtMost(len))
+        }
+        var next = occurrenceIn(from.year)
+        if (next.isBefore(from)) next = occurrenceIn(from.year + 1)
+        return ChronoUnit.DAYS.between(from, next)
     }
 }

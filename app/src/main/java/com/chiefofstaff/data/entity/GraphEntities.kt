@@ -148,3 +148,19 @@ data class Note(
     val tags: List<String> = emptyList(),
     val createdAt: Instant,
 )
+
+/**
+ * DOM-16 — a recurring date attached to a person: a birthday, an anniversary, or a promised
+ * follow-up. Stored year-agnostic as month/day so the anticipation scan can compute days-until the
+ * next occurrence and nudge a few days ahead — the whole point is to never be the one who forgot.
+ */
+@Entity(tableName = "occasion", indices = [Index("month"), Index("day")])
+data class Occasion(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val personName: String,
+    val kind: String,          // birthday, anniversary, follow_up
+    val month: Int,            // 1-12
+    val day: Int,              // 1-31
+    val note: String? = null,
+    val createdAt: Instant,
+)

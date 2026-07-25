@@ -23,6 +23,7 @@ import com.chiefofstaff.data.entity.Message
 import com.chiefofstaff.data.entity.ModeState
 import com.chiefofstaff.data.entity.Note
 import com.chiefofstaff.data.entity.NotificationLog
+import com.chiefofstaff.data.entity.Occasion
 import com.chiefofstaff.data.entity.Observation
 import com.chiefofstaff.data.entity.Person
 import com.chiefofstaff.data.entity.Prediction
@@ -41,12 +42,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         Commitment::class, WaitingOn::class,
         ValueStatement::class, Goal::class, Project::class, RuleEntity::class,
         Person::class, Interaction::class, Observation::class, Decision::class,
-        ReferenceItem::class, EventEntity::class, Note::class,
+        ReferenceItem::class, EventEntity::class, Note::class, Occasion::class,
         DayState::class, ModeState::class, Prediction::class,
         AnticipationItem::class, NotificationLog::class,
         Session::class, Message::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -68,6 +69,11 @@ abstract class CoSDatabase : RoomDatabase() {
         fun build(context: Context): CoSDatabase =
             Room.databaseBuilder(context, CoSDatabase::class.java, "cos.db")
                 .addCallback(FtsSyncCallback)
+                // Pre-1.0: the schema still moves as domains come online. Rather than carry a
+                // migration per shape change before there are real users, we rebuild on a version
+                // bump — the nightly JSON export (SYS-10/11) is the backup against data loss, and
+                // real migrations land once the schema settles for release.
+                .fallbackToDestructiveMigration()
                 .build()
 
         /**
