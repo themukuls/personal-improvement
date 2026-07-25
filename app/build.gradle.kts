@@ -73,12 +73,10 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     debugImplementation(libs.androidx.ui.tooling)
 
-    // Persistence — Room over SQLCipher (SYS-09)
+    // Persistence — plain on-device Room (SQLite) in the app's private storage
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
-    implementation(libs.sqlcipher)
-    implementation(libs.sqlite.ktx)
 
     // Background (SYS-08)
     implementation(libs.androidx.work.runtime.ktx)
@@ -86,7 +84,7 @@ dependencies {
     // Passive capture — Health Connect (CAP-07, DOM-01/02/05)
     implementation(libs.androidx.health.connect)
 
-    // Secure key storage for the SQLCipher passphrase
+    // Secure storage for provider API keys only (kept out of plaintext; not used for app data)
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.datastore.preferences)
 

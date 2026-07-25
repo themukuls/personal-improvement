@@ -9,7 +9,7 @@ manual container keeps the whole graph readable in a single file, no annotation 
 | Package | Responsibility | Spec |
 |---|---|---|
 | `core` | `Clock` (injectable time — the prediction ledger depends on it), `AppLog` | — |
-| `data` | Room entities, DAOs, SQLCipher DB, `LifeRepository` façade | §7, SYS-09 |
+| `data` | Room entities, DAOs, on-device SQLite DB, `LifeRepository` façade | §7 |
 | `llm` | Task defs, context assembler, prompt registry, provider adapters, router, validator, redaction, deterministic fallback | §6 |
 | `domain` | Commitment state machine, prediction ledger, rule engine, plan generator, anticipation, consistency | ACC/DIR |
 | `capture` | Capture manager, extraction pipeline, fact writer, speech, tile, calendar sync | CAP/MEM |
@@ -19,8 +19,10 @@ manual container keeps the whole graph readable in a single file, no annotation 
 
 ## Memory (§7)
 
-`LifeRepository` fronts Room over a SQLCipher database whose passphrase lives in Keystore-guarded
-`EncryptedSharedPreferences` — it never touches disk in plaintext (§6.8). Captures are **immutable**
+`LifeRepository` fronts a plain Room/SQLite database stored in the app's private internal storage
+(`/data/data/<pkg>/databases/cos.db`), which Android sandboxes to this app. Single user, single
+device — local storage is the whole persistence story; the nightly JSON export (SYS-10/11) is the
+backup against device loss. Captures are **immutable**
 and FTS4-indexed on write; typed facts (Commitment, WaitingOn, Goal, Project, Rule, Person, …) sit
 alongside and reference the source capture. A bad parse is always recoverable (P5, P12).
 

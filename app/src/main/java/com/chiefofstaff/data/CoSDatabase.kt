@@ -34,7 +34,6 @@ import com.chiefofstaff.data.entity.Session
 import com.chiefofstaff.data.entity.ValueStatement
 import com.chiefofstaff.data.entity.WaitingOn
 import androidx.sqlite.db.SupportSQLiteDatabase
-import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 @Database(
     entities = [
@@ -60,18 +59,16 @@ abstract class CoSDatabase : RoomDatabase() {
 
     companion object {
         /**
-         * Builds the encrypted database. The SQLCipher [SupportOpenHelperFactory] transparently
-         * encrypts every page at rest with the Keystore-guarded passphrase (SYS-09).
+         * Builds the on-device database. Room stores it as a plain SQLite file in the app's private
+         * internal storage (`/data/data/<pkg>/databases/cos.db`), which is sandboxed to this app by
+         * the Android filesystem — other apps cannot read it. Single user, single device: local
+         * storage is the whole persistence story (no server, no sync). The nightly JSON export
+         * (SYS-10/11) remains the backup against device loss.
          */
-        fun build(context: Context): CoSDatabase {
-            System.loadLibrary("sqlcipher")
-            val passphrase = DatabaseKey.getOrCreate(context)
-            val factory = SupportOpenHelperFactory(passphrase)
-            return Room.databaseBuilder(context, CoSDatabase::class.java, "cos.db")
-                .openHelperFactory(factory)
+        fun build(context: Context): CoSDatabase =
+            Room.databaseBuilder(context, CoSDatabase::class.java, "cos.db")
                 .addCallback(FtsSyncCallback)
                 .build()
-        }
 
         /**
          * Keeps the external-content FTS table [CaptureFts] in sync with [Capture] via SQLite

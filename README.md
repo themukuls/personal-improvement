@@ -40,7 +40,7 @@ The §4 layers, assembled in a hand-wired [`AppContainer`](app/src/main/java/com
 
 ```
 CAPTURE      voice / text / tile / share / calendar   →  immutable, FTS-indexed captures
-MEMORY       Room + SQLCipher life graph (§7)
+MEMORY       Room (on-device SQLite) life graph (§7)
    ├── DIRECTION       plan · what-now · rule referee · minimum-viable-day
    ├── ANTICIPATION    nightly deterministic scans → one item/day
    └── CONVERSATION    full-context thinking partner
@@ -52,6 +52,7 @@ Full detail in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ### Load-bearing invariants (the spec's "laws")
 
+- **All data is local** — a plain Room/SQLite database in the app's private storage, sandboxed to the app by Android. No server, no cloud sync; the nightly JSON export is the backup.
 - **Captures are immutable and always indexed first** (P5) — nothing you say is ever lost, even offline.
 - **Every commitment gets a verdict** (P4) — the state machine's only exits are done/skipped/dropped/archived.
 - **The 06:00 brief always fires** (P11) — a deterministic fallback runs with no network or model.

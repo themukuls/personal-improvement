@@ -63,7 +63,6 @@ Useful checks:
 | `SDK location not found` | Set `sdk.dir` in `local.properties` or export `ANDROID_HOME`. |
 | `Installed Build Tools revision X is corrupted` / missing platform 34 | Install `platforms;android-34` and `build-tools;34.0.0` via the SDK Manager. |
 | `Unsupported class file major version` / JDK errors | Use JDK 17, not 11 or 21+, for AGP 8.5. |
-| SQLCipher `UnsatisfiedLinkError` at runtime | Ensure the `net.zetetic:sqlcipher-android` native libs shipped (they do via the AAR); don't strip `libsqlcipher.so` in packaging. |
 
 ## CI
 

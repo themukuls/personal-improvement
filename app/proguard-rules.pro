@@ -14,9 +14,5 @@
 -keep class * extends androidx.room.RoomDatabase { <init>(); }
 -keep @androidx.room.Entity class *
 
-# SQLCipher
--keep class net.zetetic.** { *; }
--keep class net.sqlcipher.** { *; }
-
 # WorkManager workers are instantiated by name via reflection.
 -keep class * extends androidx.work.ListenableWorker { <init>(...); }
