@@ -70,6 +70,10 @@ interface GraphDao {
     @Query("SELECT * FROM decision ORDER BY createdAt DESC") fun decisions(): Flow<List<Decision>>
     @Query("SELECT * FROM decision ORDER BY createdAt DESC LIMIT :limit")
     suspend fun recentDecisions(limit: Int = 20): List<Decision>
+    @Query("SELECT * FROM decision WHERE id = :id") suspend fun decisionById(id: Long): Decision?
+    /** REV-08 — decisions past 90 days with no recorded outcome, for the decision audit. */
+    @Query("SELECT * FROM decision WHERE actualOutcome IS NULL AND createdAt <= :cutoff ORDER BY createdAt ASC")
+    suspend fun decisionsOlderThan(cutoff: Long): List<Decision>
 
     // Reference vault (encrypted values).
     @Insert suspend fun insertReference(r: ReferenceItem): Long

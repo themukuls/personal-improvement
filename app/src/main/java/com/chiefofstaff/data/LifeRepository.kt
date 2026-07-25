@@ -65,6 +65,12 @@ class LifeRepository(
     // DOM-15 / MEM-09 — people layer: contact cadence and logging an interaction.
     fun people(): Flow<List<com.chiefofstaff.data.entity.Person>> = graph.people()
 
+    // REV-08 / MEM-15 — record how a decision actually turned out.
+    suspend fun recordDecisionOutcome(id: Long, outcome: String) {
+        val d = graph.decisionById(id) ?: return
+        graph.updateDecision(d.copy(actualOutcome = outcome))
+    }
+
     suspend fun logContact(personId: Long) {
         val p = graph.personById(personId) ?: return
         val now = clock.now()

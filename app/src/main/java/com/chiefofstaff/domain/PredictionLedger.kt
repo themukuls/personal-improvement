@@ -69,6 +69,21 @@ class PredictionLedger(
         return repo.state.meanAbsErrorSince(since)
     }
 
+    /**
+     * ACC-13 / REV-09 — the self-accuracy report. Keeps the system's fallibility visible (§16.10):
+     * how many predictions resolved, how often it was within an hour, and the average miss. Null
+     * when there isn't enough resolved history yet.
+     */
+    suspend fun accuracyReport(): String? {
+        val since = clock.today().minusDays(30).atStartOfDay(clock.zone()).toInstant().toEpochMilli()
+        val resolved = repo.state.resolvedSince(since).filter { it.delta != null }
+        if (resolved.isEmpty()) return null
+        val n = resolved.size
+        val within = resolved.count { kotlin.math.abs(it.delta!!) <= 1f }
+        val mae = resolved.map { kotlin.math.abs(it.delta!!) }.average()
+        return "$n resolved · ${within * 100 / n}% within 1h · avg miss ${"%.1f".format(mae)}h"
+    }
+
     private fun parsePredictedTime(prediction: String): LocalTime? =
         Regex("done_by=(\\d{2}):(\\d{2})").find(prediction)?.let {
             LocalTime.of(it.groupValues[1].toInt(), it.groupValues[2].toInt())

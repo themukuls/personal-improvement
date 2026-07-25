@@ -44,6 +44,7 @@ class AnticipationEngine(
             addAll(unpreparedDependency())
             addAll(overloadForecast())
             addAll(financialCalendar())
+            addAll(decisionAudit())
         }
         val winner = candidates.maxByOrNull { it.salience } ?: return null
 
@@ -161,6 +162,20 @@ class AnticipationEngine(
                 salience = (0.7f + (dueNextWeek - 12) * 0.01f).coerceAtMost(0.9f),
             )
         )
+    }
+
+    // REV-08 — a decision made 90+ days ago whose outcome was never recorded.
+    private suspend fun decisionAudit(): List<Candidate> {
+        val cutoff = clock.now().minus(90, ChronoUnit.DAYS).toEpochMilli()
+        return repo.graph.decisionsOlderThan(cutoff).take(1).map { d ->
+            Candidate(
+                kind = AnticipationKind.DECISION_REVIEW,
+                headline = "A 90-day-old decision needs a verdict: ${d.question}",
+                detail = "You chose \"${d.chosen}\". How did it actually turn out?",
+                salience = 0.6f,
+                relatedId = d.id,
+            )
+        }
     }
 
     // ANT-09 — a money deadline (bill / EMI / renewal) approaching in the next 14 days.

@@ -52,6 +52,7 @@ fun LookScreen(
     onResolveWaiting: (Long) -> Unit,
     onLogContact: (Long) -> Unit,
     onSetMode: (Mode) -> Unit,
+    onRecordOutcome: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -152,6 +153,27 @@ fun LookScreen(
                 }
             }
         }
+        CollapsedSection("HORIZONS", LookSection.HORIZONS, state, onToggleSection) {
+            if (state.horizonGoals.isEmpty() && state.weekAttribution.isEmpty() && state.drift.isEmpty()) {
+                Text("Weekly, monthly and quarterly horizons form as goals accrue.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TrendLine("This week", "${state.weekLoad} committed")
+                    if (state.horizonGoals.isNotEmpty()) {
+                        SectionLabel("BY HORIZON")
+                        state.horizonGoals.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted) }
+                    }
+                    if (state.weekAttribution.isNotEmpty()) {
+                        SectionLabel("WHERE THE WEEK WENT")
+                        state.weekAttribution.forEach { TrendLine(it.substringBefore(":"), it.substringAfter(": ")) }
+                    }
+                    if (state.drift.isNotEmpty()) {
+                        SectionLabel("DRIFT")
+                        state.drift.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.Accent) }
+                    }
+                }
+            }
+        }
         CollapsedSection("TIMELINE", LookSection.TIMELINE, state, onToggleSection) {
             if (state.timeline.isEmpty()) Text("No captures yet.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
             else state.timeline.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted, modifier = Modifier.padding(vertical = 3.dp)) }
@@ -165,6 +187,7 @@ fun LookScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (pct != null) TrendLine("Consistency", "$pct% over 30 days")
                     if (mae != null) TrendLine("Self-accuracy", "estimates off by ~${"%.1f".format(mae)}h")
+                    state.accuracyReport?.let { Text(it, style = Mono.Status, color = Palette.InkFaint) }
                     state.healthLines.forEach { TrendLine(it.substringBefore(":"), it.substringAfter(": ")) }
                     if (state.scorecard.isNotEmpty()) {
                         Spacer(Modifier.height(4.dp))
@@ -259,11 +282,16 @@ fun LookScreen(
                         Column {
                             Text(d.question, style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
                             Text("→ ${d.chosen}", style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted)
-                            Text(
-                                if (d.hasOutcome) "reviewed" else d.reviewLabel,
-                                style = Mono.Status,
-                                color = Palette.InkFaint,
-                            )
+                            Spacer(Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    if (d.hasOutcome) "reviewed" else d.reviewLabel,
+                                    style = Mono.Status,
+                                    color = Palette.InkFaint,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                if (!d.hasOutcome) QuietChip("Mark reviewed") { onRecordOutcome(d.id) }
+                            }
                         }
                     }
                 }

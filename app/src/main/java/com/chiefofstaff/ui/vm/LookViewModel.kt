@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.Duration
 
-enum class LookSection { DIRECTION, TIMELINE, TRENDS, DOMAINS, WAITING, PEOPLE, DECISIONS, REFERENCES, CONVERSATIONS }
+enum class LookSection { DIRECTION, HORIZONS, TIMELINE, TRENDS, DOMAINS, WAITING, PEOPLE, DECISIONS, REFERENCES, CONVERSATIONS }
 
 data class LookUiState(
     val query: String = "",
@@ -48,13 +48,19 @@ data class LookUiState(
     val scorecard: List<String> = emptyList(),
     val tokensLine: String? = null,
     val sessions: List<String> = emptyList(),
+    val accuracyReport: String? = null,
+    // DIR-10/11/12 + REV-06 horizons.
+    val horizonGoals: List<String> = emptyList(),
+    val weekAttribution: List<String> = emptyList(),
+    val drift: List<String> = emptyList(),
+    val weekLoad: Int = 0,
 )
 
 data class ReferenceRow(val label: String, val value: String, val sub: String, val emergency: Boolean)
 
 data class PeopleRow(val id: Long, val name: String, val sub: String, val overdue: Boolean)
 
-data class DecisionRow(val question: String, val chosen: String, val reviewLabel: String, val hasOutcome: Boolean)
+data class DecisionRow(val id: Long, val question: String, val chosen: String, val reviewLabel: String, val hasOutcome: Boolean)
 data class WaitingRow(val id: Long, val what: String, val who: String, val context: String)
 
 /**
@@ -95,8 +101,31 @@ class LookViewModel(private val container: AppContainer) : ViewModel() {
             LookSection.REFERENCES -> loadReferences()
             LookSection.DIRECTION -> loadDirection()
             LookSection.CONVERSATIONS -> loadSessions()
+            LookSection.HORIZONS -> loadHorizons()
             else -> Unit
         }
+    }
+
+    /** DIR-10/11/12 + REV-06 — horizon summary. */
+    private fun loadHorizons() {
+        viewModelScope.launch {
+            val byHorizon = container.horizonEngine.goalsByHorizon()
+            val order = listOf("year", "quarter", "month")
+            val goalLines = order.flatMap { h ->
+                byHorizon[h]?.map { "${h.replaceFirstChar { c -> c.uppercase() }}: $it" } ?: emptyList()
+            }
+            _state.value = _state.value.copy(
+                horizonGoals = goalLines,
+                weekAttribution = container.horizonEngine.weekAttribution(),
+                drift = container.horizonEngine.drift(),
+                weekLoad = container.horizonEngine.weekLoad(),
+            )
+        }
+    }
+
+    /** REV-08 — record that a decision has been reviewed (outcome noted). */
+    fun recordDecisionOutcome(id: Long) {
+        viewModelScope.launch { container.repo.recordDecisionOutcome(id, "reviewed"); loadDecisions() }
     }
 
     /** FDN-02/03 — the value → goal → project spine that makes prioritisation non-arbitrary. */
@@ -198,7 +227,7 @@ class LookViewModel(private val container: AppContainer) : ViewModel() {
                     val date = java.time.LocalDate.ofInstant(it, zone)
                     "review ${date.dayOfMonth}/${date.monthValue}"
                 } ?: ""
-                DecisionRow(d.question, d.chosen, review, d.actualOutcome != null)
+                DecisionRow(d.id, d.question, d.chosen, review, d.actualOutcome != null)
             }
             _state.value = _state.value.copy(decisions = rows)
         }
@@ -275,6 +304,7 @@ class LookViewModel(private val container: AppContainer) : ViewModel() {
             _state.value = _state.value.copy(
                 consistencyPct = pct, predictionAccuracyHours = mae, healthLines = health,
                 scorecard = scorecard, tokensLine = tokens,
+                accuracyReport = container.ledger.accuracyReport(),
             )
         }
     }
