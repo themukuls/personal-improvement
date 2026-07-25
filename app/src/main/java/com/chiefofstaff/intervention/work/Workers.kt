@@ -71,11 +71,17 @@ class CommitmentDueWorker(c: Context, p: WorkerParameters) : ContainerWorker(c, 
             container.stateMachine.markAsked(id)
             val c = container.repo.commitments.byId(id)
             if (c != null) {
+                // INT-10 — escalation tone shifts (still neutral) as an item keeps slipping.
+                val body = when {
+                    c.deferralCount >= 2 -> "This has slipped ${c.deferralCount} times. Two minutes now, or drop it?"
+                    c.deferralCount == 1 -> "Back again — still worth doing?"
+                    else -> "Due now."
+                }
                 container.notifier.post(
                     channel = com.chiefofstaff.intervention.Channels.RITUAL,
                     id = (1_100_000 + id).toInt(),
                     title = c.what,
-                    body = "Due now.",
+                    body = body,
                     essential = false,
                     actions = listOf(
                         container.notifier.verdictAction(id, Verdict.DONE, "Done"),
@@ -86,6 +92,14 @@ class CommitmentDueWorker(c: Context, p: WorkerParameters) : ContainerWorker(c, 
             Result.success()
         }.getOrElse { Result.retry() }
     }
+}
+
+/** ACC-09 — the conditional midday pulse. */
+class MiddayPulseWorker(c: Context, p: WorkerParameters) : ContainerWorker(c, p) {
+    override suspend fun doWork(): Result = runCatching {
+        container.middayPulse.maybePost()
+        Result.success()
+    }.getOrElse { AppLog.e("worker", "midday pulse failed", it); Result.retry() }
 }
 
 /** REV-03 — the Sunday 19:00 weekly audit. */

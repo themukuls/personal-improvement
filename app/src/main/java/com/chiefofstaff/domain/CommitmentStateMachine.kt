@@ -56,6 +56,18 @@ class CommitmentStateMachine(
         }.copy(updatedAt = now, lastTouchedAt = now)
         repo.commitments.update(updated)
 
+        // INT-11 — snooze with a recorded consequence: a defer isn't free, it's written down.
+        if (verdict == Verdict.DEFERRED) {
+            repo.graph.insertNote(
+                com.chiefofstaff.data.entity.Note(
+                    text = "Snoozed \"${c.what}\" — now deferred ${updated.deferralCount}×" +
+                        if (updated.state == CommitmentState.ESCALATED) " (escalated: recommit or drop)." else ".",
+                    tags = listOf("snooze"),
+                    createdAt = now,
+                )
+            )
+        }
+
         // Close the loop on any open prediction about this commitment (§1.3, ACC-05).
         ledger.resolveForCommitment(updated, verdict)
     }

@@ -23,6 +23,7 @@ import com.chiefofstaff.domain.PredictionLedger
 import com.chiefofstaff.domain.ReductionEngine
 import com.chiefofstaff.domain.RuleEngine
 import com.chiefofstaff.intervention.EveningClose
+import com.chiefofstaff.intervention.MiddayPulse
 import com.chiefofstaff.intervention.MorningBrief
 import com.chiefofstaff.intervention.NotificationBudget
 import com.chiefofstaff.intervention.Notifier
@@ -124,6 +125,7 @@ class AppContainer(context: Context) {
     val morningBrief: MorningBrief by lazy { MorningBrief(repo, clock, orchestrator, fallback, tts, notifier, calendarSync) }
     val eveningClose: EveningClose by lazy { EveningClose(repo, clock, stateMachine, orchestrator, notifier) }
     val weeklyAudit: WeeklyAudit by lazy { WeeklyAudit(repo, clock, orchestrator, consistencyScore, ledger, notifier) }
+    val middayPulse: MiddayPulse by lazy { MiddayPulse(repo, clock, notifier) }
     val ritualScheduler: RitualScheduler by lazy { RitualScheduler(appContext, clock) }
 
     // --- System ---

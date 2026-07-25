@@ -87,4 +87,5 @@ object NotificationIds {
     const val ARCHIVE = 1005
     const val SILENT_FAILURE = 1006
     const val WEEKLY_AUDIT = 1007
+    const val MIDDAY_PULSE = 1008
 }

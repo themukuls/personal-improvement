@@ -10,6 +10,7 @@ import com.chiefofstaff.core.AppLog
 import com.chiefofstaff.core.SystemClock
 import com.chiefofstaff.intervention.work.CommitmentDueWorker
 import com.chiefofstaff.intervention.work.EveningCloseWorker
+import com.chiefofstaff.intervention.work.MiddayPulseWorker
 import com.chiefofstaff.intervention.work.MorningBriefWorker
 import com.chiefofstaff.intervention.work.NightlyBatchWorker
 import com.chiefofstaff.intervention.work.WeeklyAuditWorker
@@ -43,6 +44,8 @@ class RitualAlarmReceiver : BroadcastReceiver() {
                         wm.enqueue(OneTimeWorkRequestBuilder<NightlyBatchWorker>().build())
                     RitualScheduler.Ritual.WEEKLY_AUDIT ->
                         wm.enqueue(OneTimeWorkRequestBuilder<WeeklyAuditWorker>().build())
+                    RitualScheduler.Ritual.MIDDAY_PULSE ->
+                        wm.enqueue(OneTimeWorkRequestBuilder<MiddayPulseWorker>().build())
                 }
                 // Re-arm tomorrow's occurrence.
                 RitualScheduler(context, SystemClock()).schedule(ritual)

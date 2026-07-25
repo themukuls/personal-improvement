@@ -21,6 +21,7 @@ class RitualScheduler(
 ) {
     enum class Ritual(val hour: Int, val minute: Int, val dayOfWeek: java.time.DayOfWeek? = null) {
         MORNING_BRIEF(6, 0),
+        MIDDAY_PULSE(13, 0),                               // ACC-09 conditional check-in
         EVENING_CLOSE(21, 0),
         NIGHTLY_BATCH(2, 0),
         WEEKLY_AUDIT(19, 0, java.time.DayOfWeek.SUNDAY),   // §9.1 Sun 19:00
