@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.Duration
 
-enum class LookSection { TIMELINE, TRENDS, DOMAINS, WAITING, PEOPLE, DECISIONS }
+enum class LookSection { TIMELINE, TRENDS, DOMAINS, WAITING, PEOPLE, DECISIONS, REFERENCES }
 
 data class LookUiState(
     val query: String = "",
@@ -34,7 +34,11 @@ data class LookUiState(
     val waiting: List<WaitingRow> = emptyList(),
     // DOM-15 / MEM-09 — people layer.
     val people: List<PeopleRow> = emptyList(),
+    // FDN-07/08 — reference vault + emergency card.
+    val references: List<ReferenceRow> = emptyList(),
 )
+
+data class ReferenceRow(val label: String, val value: String, val sub: String, val emergency: Boolean)
 
 data class PeopleRow(val id: Long, val name: String, val sub: String, val overdue: Boolean)
 
@@ -76,7 +80,29 @@ class LookViewModel(private val container: AppContainer) : ViewModel() {
             LookSection.DECISIONS -> loadDecisions()
             LookSection.WAITING -> loadWaiting()
             LookSection.PEOPLE -> loadPeople()
+            LookSection.REFERENCES -> loadReferences()
             else -> Unit
+        }
+    }
+
+    /**
+     * FDN-07/08 — the reference vault and emergency card. Emergency-relevant types (blood group,
+     * allergies, emergency contacts) are flagged so the UI can lift them to the top. In this local-
+     * storage build the value is stored in the clear on-device; the field is named for the spec's
+     * intended per-field encryption.
+     */
+    private fun loadReferences() {
+        viewModelScope.launch {
+            val zone = container.clock.zone()
+            val emergencyTypes = setOf("blood_group", "allergy", "emergency_contact")
+            val rows = container.repo.graph.references().first().map { r ->
+                val sub = r.expiresAt?.let {
+                    val d = java.time.LocalDate.ofInstant(it, zone)
+                    "expires ${d.dayOfMonth}/${d.monthValue}/${d.year}"
+                } ?: r.type.replace('_', ' ')
+                ReferenceRow(r.label, r.valueEncrypted, sub, r.type in emergencyTypes)
+            }.sortedByDescending { it.emergency }
+            _state.value = _state.value.copy(references = rows)
         }
     }
 

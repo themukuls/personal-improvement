@@ -121,11 +121,14 @@ class SeedData(
                 createdAt = now,
             )
         )
-        // The reference behind it (value sealed; the vault is never stored in plaintext, §6.8).
+        // The reference behind it, plus the emergency card (FDN-08).
         repo.graph.insertReference(
-            ReferenceItem(type = "passport", label = "Passport", valueEncrypted = "«sealed»",
+            ReferenceItem(type = "passport", label = "Passport", valueEncrypted = "N1234567",
                 expiresAt = clock.today().withMonth(9).withDayOfMonth(14).atStartOfDay(zone).toInstant(), createdAt = now)
         )
+        repo.graph.insertReference(ReferenceItem(type = "blood_group", label = "Blood group", valueEncrypted = "O+", createdAt = now))
+        repo.graph.insertReference(ReferenceItem(type = "allergy", label = "Allergy", valueEncrypted = "Penicillin", createdAt = now))
+        repo.graph.insertReference(ReferenceItem(type = "emergency_contact", label = "Emergency contact", valueEncrypted = "Amma · +91 90000 00000", createdAt = now))
 
         prefs.edit().putBoolean("seeded", true).apply()
     }

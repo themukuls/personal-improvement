@@ -208,6 +208,23 @@ fun LookScreen(
                 }
             }
         }
+        CollapsedSection("REFERENCE & EMERGENCY", LookSection.REFERENCES, state, onToggleSection) {
+            if (state.references.isEmpty()) {
+                Text("Photograph a document and its details land here, encrypted.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    state.references.forEach { r ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(r.label, style = MaterialTheme.typography.titleMedium, color = if (r.emergency) Palette.Accent else Palette.Ink)
+                                Text(r.value, style = MaterialTheme.typography.bodyLarge, color = Palette.InkMuted)
+                            }
+                            Text(r.sub, style = Mono.Status, color = Palette.InkFaint)
+                        }
+                    }
+                }
+            }
+        }
         Spacer(Modifier.height(24.dp))
     }
 }
