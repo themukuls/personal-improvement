@@ -1,0 +1,13 @@
+{
+  "id": "summarise_meeting@1",
+  "version": "1",
+  "system": "You summarise a meeting from its rough transcript (captured by on-device speech recognition, so expect errors — infer intent, don't quote verbatim). Write a short neutral summary (2-4 sentences), then extract concrete action items and any decisions made. An action item is something someone committed to do; capture who owns it when the transcript makes it clear, else leave who empty. Only include items actually stated. Dry chief-of-staff tone, no filler.",
+  "userTemplate": "Meeting transcript and known people:\n{{context}}\n\nSummarise and extract.",
+  "schema": "{\"type\": \"object\", \"required\": [\"summary\", \"action_items\"], \"properties\": {\"summary\": {\"type\": \"string\"}, \"action_items\": {\"type\": \"array\", \"items\": {\"type\": \"object\", \"required\": [\"what\"], \"properties\": {\"what\": {\"type\": \"string\"}, \"who\": {\"type\": \"string\"}}}}, \"decisions\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}}}}",
+  "fewShot": [
+    {
+      "input": "MEETING_TRANSCRIPT\nokay so for the launch we agreed to push to next friday. rakesh will finalise the pricing deck by wednesday and i'll send the comms draft to legal. we decided not to do the paid ads this quarter.",
+      "output": "{\"summary\": \"Launch moved to next Friday. Pricing and comms work assigned; paid ads deferred this quarter.\", \"action_items\": [{\"what\": \"Finalise the pricing deck\", \"who\": \"Rakesh\"}, {\"what\": \"Send the comms draft to legal\", \"who\": \"\"}], \"decisions\": [\"Launch pushed to next Friday\", \"No paid ads this quarter\"]}"
+    }
+  ]
+}

@@ -60,14 +60,26 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
         val speechState by speech.state.collectAsStateWithLifecycle()
         val inSession by speech.continuous.collectAsStateWithLifecycle()
         var listening by remember { mutableStateOf(false) }
+        // CAP-17 — a session accumulates a rough meeting transcript, summarised when it ends.
+        val meetingBuffer = remember { StringBuilder() }
+
+        // End a hands-free session: stop listening and, if enough was said, summarise it (CAP-17).
+        val endSession = {
+            val transcript = meetingBuffer.toString().trim()
+            meetingBuffer.clear()
+            speech.stop()
+            listening = false
+            if (transcript.length >= 120) scope.launch { container.meetingSummariser.summarise(transcript) }
+        }
 
         // Route a finished transcript into the capture pipeline (CAP-01). In a hands-free session
-        // (CNV-13) each utterance is captured but the overlay stays up — the recogniser auto-restarts.
+        // (CNV-13) each utterance is captured, the overlay stays up (the recogniser auto-restarts),
+        // and the text is also appended to the meeting buffer for the end-of-session summary.
         LaunchedEffect(speechState) {
             (speechState as? SpeechCaptureController.State.Final)?.let { final ->
                 scope.launch { container.captureManager.captureVoice(final.text) }
                 speech.reset()
-                if (!inSession) listening = false
+                if (!inSession) listening = false else meetingBuffer.append(final.text).append(' ')
             }
         }
         DisposableEffect(Unit) { onDispose { speech.stop() } }
@@ -86,7 +98,7 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
                     onHoldEnd = { speech.stop() },
                     // CNV-13 — double-tap toggles a continuous hands-free session.
                     onSessionToggle = {
-                        if (inSession) { speech.stop(); listening = false }
+                        if (inSession) endSession()
                         else { listening = true; speech.startContinuous() }
                     },
                 )
@@ -141,7 +153,7 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
                     ListeningOverlay(
                         partial = (speechState as? SpeechCaptureController.State.Partial)?.text.orEmpty(),
                         inSession = inSession,
-                        onStopSession = { speech.stop(); listening = false },
+                        onStopSession = endSession,
                     )
                 }
             }

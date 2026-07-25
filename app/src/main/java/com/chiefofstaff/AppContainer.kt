@@ -9,6 +9,7 @@ import com.chiefofstaff.capture.FactExtractionPipeline
 import com.chiefofstaff.capture.FactWriter
 import com.chiefofstaff.capture.HealthConnectSync
 import com.chiefofstaff.capture.MealEstimator
+import com.chiefofstaff.capture.MeetingSummariser
 import com.chiefofstaff.capture.ScreenTimeSync
 import com.chiefofstaff.core.Clock
 import com.chiefofstaff.core.SystemClock
@@ -122,6 +123,7 @@ class AppContainer(context: Context) {
     val healthConnectSync: HealthConnectSync by lazy { HealthConnectSync(appContext, repo, clock) }
     val screenTimeSync: ScreenTimeSync by lazy { ScreenTimeSync(appContext, repo, clock) }
     val mealEstimator: MealEstimator by lazy { MealEstimator(repo, clock, orchestrator) }
+    val meetingSummariser: MeetingSummariser by lazy { MeetingSummariser(repo, clock, orchestrator) }
 
     // --- Intervention ---
     val notificationBudget: NotificationBudget by lazy { NotificationBudget(appContext, repo, clock) }

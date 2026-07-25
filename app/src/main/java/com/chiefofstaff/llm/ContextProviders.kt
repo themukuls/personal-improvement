@@ -125,6 +125,16 @@ class TopAnticipationProvider(private val repo: LifeRepository, private val cloc
     }
 }
 
+/** Known people by name, so meeting summaries can attribute action items (CAP-17). */
+class KnownPeopleProvider(private val repo: LifeRepository) : ContextProvider {
+    override val key = "known_people"
+    override suspend fun render(params: Map<String, Any?>, budgetTokens: Int): String {
+        val names = repo.graph.people().first().map { it.name }
+        if (names.isEmpty()) return ""
+        return clampToBudget(listOf(names.joinToString(", ")), budgetTokens)
+    }
+}
+
 /** DIR-14 — recent decisions as analogues, so Decide-mode can reason against past choices. */
 class RecentDecisionsProvider(private val repo: LifeRepository) : ContextProvider {
     override val key = "recent_decisions"
@@ -143,6 +153,7 @@ object ContextProviders {
         CalendarProvider(repo, clock),
         OpenCommitmentsProvider(repo, clock),
         RecentDecisionsProvider(repo),
+        KnownPeopleProvider(repo),
         DueCommitmentsProvider(repo, clock),
         ActiveRulesProvider(repo),
         CurrentStateProvider(repo, clock),
