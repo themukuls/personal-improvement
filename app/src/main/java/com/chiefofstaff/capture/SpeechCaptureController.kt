@@ -30,15 +30,33 @@ class SpeechCaptureController(private val context: Context) {
     private val _state = MutableStateFlow<State>(State.Idle)
     val state: StateFlow<State> = _state
 
+    /** CNV-13 — whether we're in a continuous, hands-free session (auto-restart after each utterance). */
+    private val _continuous = MutableStateFlow(false)
+    val continuous: StateFlow<Boolean> = _continuous
+
     private var recognizer: SpeechRecognizer? = null
 
     fun available(): Boolean = SpeechRecognizer.isRecognitionAvailable(context)
 
-    fun start() {
+    /** Single hold-to-talk capture (CAP-01). */
+    fun start() = startInternal()
+
+    /**
+     * CNV-13 — begin a continuous hands-free session: after each recognised utterance the recogniser
+     * restarts itself, so the user can dictate several thoughts in a row without touching the button.
+     * Recoverable errors (a pause, no match) simply restart; a hard failure ends the session.
+     */
+    fun startContinuous() {
+        _continuous.value = true
+        startInternal()
+    }
+
+    private fun startInternal() {
         if (!available()) {
             _state.value = State.Error("On-device recognition unavailable")
             return
         }
+        recognizer?.run { runCatching { destroy() } }
         val r = SpeechRecognizer.createSpeechRecognizer(context).also { recognizer = it }
         r.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) { _state.value = State.Listening }
@@ -52,10 +70,15 @@ class SpeechCaptureController(private val context: Context) {
             override fun onResults(results: Bundle?) {
                 val text = results.firstResult().orEmpty()
                 _state.value = if (text.isBlank()) State.Idle else State.Final(text)
+                if (_continuous.value) restartSoon()
             }
             override fun onError(error: Int) {
                 AppLog.w("speech", "recognizer error $error")
-                _state.value = State.Error("Didn't catch that")
+                // In a session, a pause or no-match is expected — keep the session alive.
+                val recoverable = error == SpeechRecognizer.ERROR_NO_MATCH ||
+                    error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                if (_continuous.value && recoverable) restartSoon()
+                else _state.value = State.Error("Didn't catch that")
             }
             override fun onEvent(eventType: Int, params: Bundle?) {}
         })
@@ -68,7 +91,16 @@ class SpeechCaptureController(private val context: Context) {
             .onFailure { _state.value = State.Error("Could not start listening") }
     }
 
+    /** Recreate the recogniser for the next utterance in a continuous session. */
+    private fun restartSoon() {
+        if (!_continuous.value) return
+        recognizer?.run { runCatching { destroy() } }
+        recognizer = null
+        startInternal()
+    }
+
     fun stop() {
+        _continuous.value = false
         recognizer?.run { stopListening(); destroy() }
         recognizer = null
         if (_state.value is State.Listening) _state.value = State.Idle

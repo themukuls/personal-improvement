@@ -36,6 +36,7 @@ fun BottomBar(
     onHoldStart: () -> Unit,
     onHoldEnd: () -> Unit,
     modifier: Modifier = Modifier,
+    onSessionToggle: () -> Unit = {},
 ) {
     Row(
         modifier = modifier
@@ -69,6 +70,6 @@ fun BottomBar(
             }
         }
         Spacer(Modifier.width(14.dp))
-        HoldToTalkButton(onHoldStart = onHoldStart, onHoldEnd = onHoldEnd)
+        HoldToTalkButton(onHoldStart = onHoldStart, onHoldEnd = onHoldEnd, onLongPress = onSessionToggle)
     }
 }

@@ -108,6 +108,7 @@ fun HoldToTalkButton(
     onHoldStart: () -> Unit,
     onHoldEnd: () -> Unit,
     modifier: Modifier = Modifier,
+    onLongPress: () -> Unit = {},
     sizeDp: Int = 44,
 ) {
     var held by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
@@ -120,6 +121,8 @@ fun HoldToTalkButton(
             .background(AvatarGradient)
             .pointerInput(Unit) {
                 detectTapGestures(
+                    // Long-press toggles a hands-free session (CNV-13); a plain hold is one capture.
+                    onLongPress = { onLongPress() },
                     onPress = {
                         held = true
                         onHoldStart()

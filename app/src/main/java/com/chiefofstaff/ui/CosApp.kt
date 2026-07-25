@@ -1,6 +1,8 @@
 package com.chiefofstaff.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -56,14 +58,16 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
         val scope = rememberCoroutineScope()
         val speech = remember { SpeechCaptureController(container.appContext) }
         val speechState by speech.state.collectAsStateWithLifecycle()
+        val inSession by speech.continuous.collectAsStateWithLifecycle()
         var listening by remember { mutableStateOf(false) }
 
-        // Route a finished transcript into the capture pipeline (CAP-01).
+        // Route a finished transcript into the capture pipeline (CAP-01). In a hands-free session
+        // (CNV-13) each utterance is captured but the overlay stays up — the recogniser auto-restarts.
         LaunchedEffect(speechState) {
             (speechState as? SpeechCaptureController.State.Final)?.let { final ->
                 scope.launch { container.captureManager.captureVoice(final.text) }
                 speech.reset()
-                listening = false
+                if (!inSession) listening = false
             }
         }
         DisposableEffect(Unit) { onDispose { speech.stop() } }
@@ -80,6 +84,11 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
                     onSelect = { current = it },
                     onHoldStart = { listening = true; speech.start() },
                     onHoldEnd = { speech.stop() },
+                    // CNV-13 — long-press toggles a continuous hands-free session.
+                    onSessionToggle = {
+                        if (inSession) { speech.stop(); listening = false }
+                        else { listening = true; speech.startContinuous() }
+                    },
                 )
             },
         ) { padding ->
@@ -131,6 +140,8 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
                 if (listening) {
                     ListeningOverlay(
                         partial = (speechState as? SpeechCaptureController.State.Partial)?.text.orEmpty(),
+                        inSession = inSession,
+                        onStopSession = { speech.stop(); listening = false },
                     )
                 }
             }
@@ -139,16 +150,19 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
 }
 
 @Composable
-private fun ListeningOverlay(partial: String) {
+private fun ListeningOverlay(partial: String, inSession: Boolean = false, onStopSession: () -> Unit = {}) {
+    val base = Modifier.fillMaxSize().background(Palette.Base.copy(alpha = 0.86f))
     Box(
-        modifier = Modifier.fillMaxSize().background(Palette.Base.copy(alpha = 0.86f)),
+        modifier = if (inSession) base.clickable(
+            interactionSource = remember { MutableInteractionSource() }, indication = null,
+        ) { onStopSession() } else base,
         contentAlignment = Alignment.Center,
     ) {
         Box(contentAlignment = Alignment.Center) {
             GradientDot(sizeDp = 120)
         }
         Text(
-            text = partial.ifBlank { "Listening…" },
+            text = partial.ifBlank { if (inSession) "Hands-free — tap to end" else "Listening…" },
             style = androidx.compose.material3.MaterialTheme.typography.titleLarge,
             color = Palette.Ink,
             modifier = Modifier.padding(horizontal = 40.dp, vertical = 200.dp),
