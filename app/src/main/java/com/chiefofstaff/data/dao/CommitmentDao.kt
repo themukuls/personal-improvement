@@ -79,4 +79,7 @@ interface CommitmentDao {
 
     @Query("SELECT * FROM waiting_on WHERE state IN ('OPEN','CHASED') AND expectedBy < :now")
     suspend fun overdueWaiting(now: Long): List<WaitingOn>
+
+    @Query("SELECT * FROM waiting_on WHERE id = :id")
+    suspend fun waitingById(id: Long): WaitingOn?
 }

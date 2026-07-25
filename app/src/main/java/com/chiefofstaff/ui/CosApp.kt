@@ -118,6 +118,8 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
                             onSetQuiet = lookVm::setQuiet,
                             onDrop = lookVm::drop,
                             onBankruptcy = lookVm::declareBankruptcy,
+                            onChase = lookVm::chase,
+                            onResolveWaiting = lookVm::resolveWaiting,
                         )
                     }
                 }

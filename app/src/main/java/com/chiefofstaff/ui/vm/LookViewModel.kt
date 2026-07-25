@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.Duration
 
-enum class LookSection { TIMELINE, TRENDS, DOMAINS, PEOPLE, DECISIONS }
+enum class LookSection { TIMELINE, TRENDS, DOMAINS, WAITING, PEOPLE, DECISIONS }
 
 data class LookUiState(
     val query: String = "",
@@ -30,9 +30,12 @@ data class LookUiState(
     val domainCounts: Map<Domain, Int> = emptyMap(),
     // MEM-15 — decision archive.
     val decisions: List<DecisionRow> = emptyList(),
+    // MEM-11 — waiting-on register.
+    val waiting: List<WaitingRow> = emptyList(),
 )
 
 data class DecisionRow(val question: String, val chosen: String, val reviewLabel: String, val hasOutcome: Boolean)
+data class WaitingRow(val id: Long, val what: String, val who: String, val context: String)
 
 /**
  * Backs the Look screen (§3.2, UX-05). Search over the FTS index plus four collapsed sections. Now
@@ -67,8 +70,36 @@ class LookViewModel(private val container: AppContainer) : ViewModel() {
             LookSection.TRENDS -> loadTrends()
             LookSection.DOMAINS -> loadReduction()
             LookSection.DECISIONS -> loadDecisions()
+            LookSection.WAITING -> loadWaiting()
             else -> Unit
         }
+    }
+
+    /** MEM-11 — load the waiting-on register (what others owe you). */
+    private fun loadWaiting() {
+        viewModelScope.launch {
+            val zone = container.clock.zone()
+            val rows = container.repo.openWaiting().first().map { w ->
+                val ctx = buildString {
+                    w.expectedBy?.let {
+                        val d = java.time.LocalDate.ofInstant(it, zone)
+                        append("expected ${d.dayOfMonth}/${d.monthValue}")
+                    }
+                    if (w.chaseCount > 0) { if (isNotEmpty()) append(" · "); append("chased ${w.chaseCount}×") }
+                }
+                WaitingRow(w.id, w.what, w.who, ctx)
+            }
+            _state.value = _state.value.copy(waiting = rows)
+        }
+    }
+
+    /** ACC-11 — chase (nudge) an outstanding item, or mark it resolved. */
+    fun chase(id: Long) {
+        viewModelScope.launch { container.repo.chaseWaiting(id); loadWaiting() }
+    }
+
+    fun resolveWaiting(id: Long) {
+        viewModelScope.launch { container.repo.resolveWaiting(id); loadWaiting() }
     }
 
     /** MEM-15 — the decision archive with review dates and outcomes. */

@@ -85,6 +85,17 @@ class SeedData(
             )
         )
 
+        // MEM-11 — a waiting-on (what someone owes you), overdue so the register has substance.
+        repo.commitments.insertWaiting(
+            com.chiefofstaff.data.entity.WaitingOn(
+                what = "Signed vendor contract",
+                who = "Legal",
+                domain = Domain.WORK,
+                expectedBy = at(9, 0).minusSeconds(2L * 86_400),
+                createdAt = now, lastTouchedAt = now,
+            )
+        )
+
         // The single anticipation card (LOOKING AHEAD).
         repo.state.insertAnticipation(
             AnticipationItem(

@@ -43,6 +43,25 @@ class LifeRepository(
     // --- Now-screen reactive reads ---
     fun openCommitments(): Flow<List<Commitment>> = commitments.openCommitments()
 
+    // MEM-11 / ACC-11 — the waiting-on register: what others owe you, and chasing it.
+    fun openWaiting(): Flow<List<com.chiefofstaff.data.entity.WaitingOn>> = commitments.openWaiting()
+
+    suspend fun chaseWaiting(id: Long) {
+        val w = commitments.waitingById(id) ?: return
+        commitments.updateWaiting(
+            w.copy(
+                chaseCount = w.chaseCount + 1,
+                state = com.chiefofstaff.data.model.LoopState.CHASED,
+                lastTouchedAt = clock.now(),
+            )
+        )
+    }
+
+    suspend fun resolveWaiting(id: Long) {
+        val w = commitments.waitingById(id) ?: return
+        commitments.updateWaiting(w.copy(state = com.chiefofstaff.data.model.LoopState.RESOLVED, lastTouchedAt = clock.now()))
+    }
+
     // --- Mode + day state ---
     fun modeFlow(): Flow<ModeState?> = state.modeFlow()
 

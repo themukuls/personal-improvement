@@ -44,6 +44,8 @@ fun LookScreen(
     onSetQuiet: (Int?) -> Unit,
     onDrop: (ReductionEngine.ReductionItem) -> Unit,
     onBankruptcy: (Domain) -> Unit,
+    onChase: (Long) -> Unit,
+    onResolveWaiting: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -138,6 +140,26 @@ fun LookScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(item.label, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted, modifier = Modifier.weight(1f))
                             QuietChip("Drop") { onDrop(item) }
+                        }
+                    }
+                }
+            }
+        }
+        CollapsedSection("WAITING ON", LookSection.WAITING, state, onToggleSection) {
+            if (state.waiting.isEmpty()) {
+                Text("Things others owe you show up here.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    state.waiting.forEach { w ->
+                        Column {
+                            Text(w.what, style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
+                            Text("from ${w.who}${if (w.context.isNotBlank()) " · ${w.context}" else ""}",
+                                style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+                            Spacer(Modifier.height(4.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                QuietChip("Chase") { onChase(w.id) }
+                                QuietChip("Got it") { onResolveWaiting(w.id) }
+                            }
                         }
                     }
                 }
