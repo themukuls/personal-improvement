@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
 import com.chiefofstaff.data.dao.CaptureDao
 import com.chiefofstaff.data.dao.CommitmentDao
 import com.chiefofstaff.data.dao.ConversationDao
@@ -69,12 +70,31 @@ abstract class CoSDatabase : RoomDatabase() {
         fun build(context: Context): CoSDatabase =
             Room.databaseBuilder(context, CoSDatabase::class.java, "cos.db")
                 .addCallback(FtsSyncCallback)
-                // Pre-1.0: the schema still moves as domains come online. Rather than carry a
-                // migration per shape change before there are real users, we rebuild on a version
-                // bump — the nightly JSON export (SYS-10/11) is the backup against data loss, and
-                // real migrations land once the schema settles for release.
-                .fallbackToDestructiveMigration()
+                .addMigrations(MIGRATION_1_2)
                 .build()
+
+        /**
+         * v1 → v2: add the `occasion` table (DOM-16). A real, data-preserving migration — nothing
+         * else on the graph is touched, so existing captures, commitments and history survive the
+         * upgrade. Column types and index names mirror Room's generated schema for [Occasion] so the
+         * post-migration validation passes.
+         */
+        val MIGRATION_1_2: Migration = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `occasion` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`personName` TEXT NOT NULL, " +
+                        "`kind` TEXT NOT NULL, " +
+                        "`month` INTEGER NOT NULL, " +
+                        "`day` INTEGER NOT NULL, " +
+                        "`note` TEXT, " +
+                        "`createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_occasion_month` ON `occasion` (`month`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_occasion_day` ON `occasion` (`day`)")
+            }
+        }
 
         /**
          * Keeps the external-content FTS table [CaptureFts] in sync with [Capture] via SQLite
