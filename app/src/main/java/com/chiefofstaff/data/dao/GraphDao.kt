@@ -59,6 +59,8 @@ interface GraphDao {
     @Insert suspend fun insertObservation(o: Observation): Long
     @Query("SELECT * FROM observation WHERE metric = :metric ORDER BY observedAt DESC LIMIT :limit")
     suspend fun observations(metric: String, limit: Int = 60): List<Observation>
+    @Query("SELECT * FROM observation WHERE metric = :metric AND observedAt >= :since ORDER BY observedAt DESC")
+    suspend fun observationsSince(metric: String, since: Long): List<Observation>
     @Query("SELECT * FROM observation ORDER BY observedAt DESC LIMIT :limit")
     fun recentObservations(limit: Int = 30): Flow<List<Observation>>
 

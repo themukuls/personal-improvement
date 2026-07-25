@@ -5,6 +5,7 @@ import com.chiefofstaff.core.Clock
 import com.chiefofstaff.data.LifeRepository
 import com.chiefofstaff.data.entity.Note
 import com.chiefofstaff.domain.ConsistencyScore
+import com.chiefofstaff.domain.InsightEngine
 import com.chiefofstaff.domain.PredictionLedger
 import com.chiefofstaff.llm.LlmOrchestrator
 import com.chiefofstaff.llm.TaskId
@@ -24,6 +25,7 @@ class WeeklyAudit(
     private val orchestrator: LlmOrchestrator,
     private val consistency: ConsistencyScore,
     private val ledger: PredictionLedger,
+    private val insight: InsightEngine,
     private val notifier: Notifier,
 ) {
     data class Result(val summary: String, val oneChange: String?, val usedFallback: Boolean)
@@ -48,11 +50,18 @@ class WeeklyAudit(
             repo.graph.insertNote(Note(text = "Weekly change: $oneChange", tags = listOf("weekly_audit"), createdAt = clock.now()))
         }
 
+        // DOM-12 — append the week's spend breakdown if any transactions were seen.
+        val spendLine = runCatching { insight.spendSummaryLine(7) }.getOrNull()
+        val body = buildString {
+            append(oneChange?.let { "$summary\n\nOne change: $it" } ?: summary)
+            if (spendLine != null) append("\n\n").append(spendLine)
+        }
+
         notifier.post(
             channel = Channels.RITUAL,
             id = NotificationIds.WEEKLY_AUDIT,
             title = "Weekly audit",
-            body = oneChange?.let { "$summary\n\nOne change: $it" } ?: summary,
+            body = body,
             essential = true,   // a ritual (§9.1); bypasses the discretionary budget
         )
         AppLog.i("audit", "weekly audit delivered (fallback=$usedFallback)")

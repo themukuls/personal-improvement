@@ -115,7 +115,7 @@ class AppContainer(context: Context) {
     // --- Capture ---
     private val factWriter: FactWriter by lazy { FactWriter(repo, clock) }
     val extractionPipeline: FactExtractionPipeline by lazy { FactExtractionPipeline(repo, orchestrator, factWriter, clock) }
-    val captureManager: CaptureManager by lazy { CaptureManager(repo, extractionPipeline, appScope, ::isOnline) }
+    val captureManager: CaptureManager by lazy { CaptureManager(repo, extractionPipeline, appScope, clock, ::isOnline) }
     val calendarSync: CalendarSync by lazy { CalendarSync(appContext, repo, clock) }
     val healthConnectSync: HealthConnectSync by lazy { HealthConnectSync(appContext, repo, clock) }
     val screenTimeSync: ScreenTimeSync by lazy { ScreenTimeSync(appContext, repo, clock) }
@@ -127,7 +127,7 @@ class AppContainer(context: Context) {
     private val tts: TtsSpeaker by lazy { TtsSpeaker(appContext) }
     val morningBrief: MorningBrief by lazy { MorningBrief(repo, clock, orchestrator, fallback, tts, notifier, calendarSync) }
     val eveningClose: EveningClose by lazy { EveningClose(repo, clock, stateMachine, orchestrator, notifier) }
-    val weeklyAudit: WeeklyAudit by lazy { WeeklyAudit(repo, clock, orchestrator, consistencyScore, ledger, notifier) }
+    val weeklyAudit: WeeklyAudit by lazy { WeeklyAudit(repo, clock, orchestrator, consistencyScore, ledger, insightEngine, notifier) }
     val middayPulse: MiddayPulse by lazy { MiddayPulse(repo, clock, notifier) }
     val periodReview: PeriodReview by lazy { PeriodReview(repo, clock, consistencyScore, horizonEngine, notifier) }
     val ritualScheduler: RitualScheduler by lazy { RitualScheduler(appContext, clock) }

@@ -38,6 +38,27 @@ class InsightEngine(
     }
 
     /**
+     * DOM-12 — spend totals by category over the last [days], from the "spend" observations recorded
+     * off payment notifications. Deterministic and local; returns highest category first.
+     */
+    suspend fun spendByCategory(days: Int = 7): List<Pair<String, Double>> {
+        val since = clock.today().minusDays(days.toLong()).atStartOfDay(clock.zone()).toInstant().toEpochMilli()
+        return repo.graph.observationsSince("spend", since)
+            .groupBy { it.unit ?: "other" }
+            .map { (cat, obs) -> cat to obs.sumOf { it.value } }
+            .sortedByDescending { it.second }
+    }
+
+    /** One neutral line for the weekly audit, or null if nothing was spent. */
+    suspend fun spendSummaryLine(days: Int = 7): String? {
+        val byCat = spendByCategory(days)
+        if (byCat.isEmpty()) return null
+        val total = byCat.sumOf { it.second }
+        val parts = byCat.take(4).joinToString(", ") { "${it.first} ₹${it.second.toLong()}" }
+        return "Spend (${days}d): ₹${total.toLong()} — $parts"
+    }
+
+    /**
      * RES-07 — a 0..1 load score for today from the number and energy cost of open, timed items.
      * Persisted to DayState so the planner (minimum-viable-day) and the Now warning can read it.
      */
