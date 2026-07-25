@@ -60,13 +60,21 @@ class PlanGenerator(
         }
 
         val offline = result !is LlmOrchestrator.TaskResult.Structured
+        // DIR-07 — on a low-energy day, prefer lower-energy items first.
+        val preferLowEnergy = (day.energy ?: 3) <= 2
         val chosen: List<Commitment> = if (ids.isNotEmpty()) {
             ids.mapNotNull { id -> open.firstOrNull { it.id == id } }
         } else {
-            // Fallback ordering: due first, then leverage-neutral recency.
+            // Fallback ordering: due first, then energy-aware, then recency-neutral.
             if (offline) AppLog.i("plan", "using deterministic plan (offline or unparsed)")
             open.filterNot { it.id in excluded }
-                .sortedWith(compareBy({ it.dueAt == null }, { it.dueAt }))
+                .sortedWith(
+                    compareBy(
+                        { it.dueAt == null },
+                        { if (preferLowEnergy) it.energyCost.ordinal else 0 },
+                        { it.dueAt },
+                    )
+                )
         }
 
         val items = chosen.filterNot { it.id in excluded }.take(cap)

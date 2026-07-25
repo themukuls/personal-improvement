@@ -110,6 +110,15 @@ class SeedData(
             )
         )
 
+        // DOM-11 — a money bill due soon, so the financial calendar scan has something to find.
+        repo.commitments.insert(
+            Commitment(
+                what = "Pay electricity bill", dueAt = at(19, 0).plusSeconds(3L * 86_400),
+                domain = Domain.MONEY, state = CommitmentState.SCHEDULED, contextNote = "₹2,400 · recurring",
+                createdAt = now, updatedAt = now, lastTouchedAt = now,
+            )
+        )
+
         // MEM-11 — a waiting-on (what someone owes you), overdue so the register has substance.
         repo.commitments.insertWaiting(
             com.chiefofstaff.data.entity.WaitingOn(

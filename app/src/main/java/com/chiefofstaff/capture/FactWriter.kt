@@ -72,13 +72,13 @@ class FactWriter(
                 ); true
             }
             "person" -> {
-                repo.graph.insertPerson(
-                    Person(
-                        name = fact.str("name") ?: return false,
-                        relationship = fact.str("relationship"),
-                        createdAt = now,
-                    )
-                ); true
+                // MEM-07 — light entity resolution: don't create a duplicate if the person (or an
+                // alias) already exists.
+                val name = fact.str("name") ?: return false
+                if (repo.graph.findPerson(name) == null) {
+                    repo.graph.insertPerson(Person(name = name, relationship = fact.str("relationship"), createdAt = now))
+                }
+                true
             }
             "decision" -> {
                 repo.graph.insertDecision(

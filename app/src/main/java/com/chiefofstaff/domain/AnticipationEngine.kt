@@ -5,6 +5,7 @@ import com.chiefofstaff.data.LifeRepository
 import com.chiefofstaff.data.entity.AnticipationItem
 import com.chiefofstaff.data.entity.DayState
 import com.chiefofstaff.data.model.AnticipationKind
+import com.chiefofstaff.data.model.Domain
 import java.time.temporal.ChronoUnit
 
 /**
@@ -40,6 +41,9 @@ class AnticipationEngine(
             addAll(waitingDecay())
             addAll(decisionReview())
             addAll(neglectDetection())
+            addAll(unpreparedDependency())
+            addAll(overloadForecast())
+            addAll(financialCalendar())
         }
         val winner = candidates.maxByOrNull { it.salience } ?: return null
 
@@ -112,6 +116,68 @@ class AnticipationEngine(
                 detail = "Past your ${cadence}-day cadence by $overdueDays days.",
                 salience = (0.5f + overdueDays / 60f).coerceAtMost(0.85f),
                 relatedId = p.id,
+            )
+        }
+    }
+
+    // ANT-04 — an event in the next 14 days that reads like it needs prep, with none scheduled.
+    private suspend fun unpreparedDependency(): List<Candidate> {
+        val now = clock.now()
+        val horizon = now.plus(14, ChronoUnit.DAYS)
+        val events = repo.graph.eventsBetween(now.toEpochMilli(), horizon.toEpochMilli())
+        val open = repo.commitments.openCommitmentsNow()
+        val prepKeywords = listOf("flight", "travel", "trip", "meeting", "interview", "review", "demo", "launch")
+        return events.mapNotNull { ev ->
+            val title = ev.title.lowercase()
+            if (prepKeywords.none { title.contains(it) }) return@mapNotNull null
+            val firstWord = ev.title.substringBefore(' ').lowercase()
+            val hasPrep = open.any { it.what.lowercase().contains(firstWord) || it.what.lowercase().contains("prep") }
+            if (hasPrep) return@mapNotNull null
+            val days = ChronoUnit.DAYS.between(now, ev.start).coerceAtLeast(0)
+            Candidate(
+                kind = AnticipationKind.HORIZON,
+                headline = "${ev.title} is coming and nothing's prepped.",
+                detail = "In $days day${if (days == 1L) "" else "s"} — worth a prep item.",
+                salience = (0.8f - days / 28f).coerceIn(0.55f, 0.8f),
+                relatedId = ev.id,
+            )
+        }
+    }
+
+    // ANT-05 — next week's committed load looks heavier than a normal week can hold.
+    private suspend fun overloadForecast(): List<Candidate> {
+        val now = clock.now()
+        val weekEnd = now.plus(7, ChronoUnit.DAYS)
+        val dueNextWeek = repo.commitments.openCommitmentsNow().count { c ->
+            val due = c.dueAt ?: return@count false
+            !due.isBefore(now) && !due.isAfter(weekEnd)
+        }
+        if (dueNextWeek < 12) return emptyList()
+        return listOf(
+            Candidate(
+                kind = AnticipationKind.OVERLOAD,
+                headline = "Next week is stacking up.",
+                detail = "$dueNextWeek commitments land in seven days. Worth pruning before it hits.",
+                salience = (0.7f + (dueNextWeek - 12) * 0.01f).coerceAtMost(0.9f),
+            )
+        )
+    }
+
+    // ANT-09 — a money deadline (bill / EMI / renewal) approaching in the next 14 days.
+    private suspend fun financialCalendar(): List<Candidate> {
+        val now = clock.now()
+        val horizon = now.plus(14, ChronoUnit.DAYS)
+        return repo.commitments.openCommitmentsNow().mapNotNull { c ->
+            if (c.domain != Domain.MONEY) return@mapNotNull null
+            val due = c.dueAt ?: return@mapNotNull null
+            if (due.isAfter(horizon)) return@mapNotNull null
+            val days = ChronoUnit.DAYS.between(now, due).coerceAtLeast(0)
+            Candidate(
+                kind = AnticipationKind.FINANCIAL,
+                headline = "${c.what} is due " + if (days == 0L) "today." else "in $days day${if (days == 1L) "" else "s"}.",
+                detail = "A money deadline is coming up.",
+                salience = (0.78f + (1f - days / 14f) * 0.15f).coerceIn(0f, 0.93f),
+                relatedId = c.id,
             )
         }
     }

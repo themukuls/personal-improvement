@@ -63,6 +63,10 @@ class NowViewModel(private val container: AppContainer) : ViewModel() {
         val rows = commitments.filterNot { it.id in excluded }.map { c -> c.toRow(zone) }
         val rightNow = container.planGenerator.whatNow()?.what
 
+        // DIR-08 conflicts + DIR-05 overcommit warning join the NOT TODAY / refusals line.
+        val conflicts = container.insightEngine.conflicts()
+        val overcommit = container.insightEngine.overcommitWarning()
+
         // Next calendar event for the status line.
         val start = today.atStartOfDay(zone).toInstant()
         val events = repo.graph.eventsBetween(start.toEpochMilli(), start.plusSeconds(86_400).toEpochMilli())
@@ -79,7 +83,7 @@ class NowViewModel(private val container: AppContainer) : ViewModel() {
             rightNow = rightNow,
             anticipation = anticipation,
             today = rows,
-            notToday = violations.map { it.explanation },
+            notToday = violations.map { it.explanation } + conflicts + listOfNotNull(overcommit),
             energyToday = day?.energy,
             reentryDays = container.daysAway,
             loading = false,

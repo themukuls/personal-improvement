@@ -15,6 +15,7 @@ import com.chiefofstaff.data.LifeRepository
 import com.chiefofstaff.domain.AnticipationEngine
 import com.chiefofstaff.domain.CommitmentStateMachine
 import com.chiefofstaff.domain.ConsistencyScore
+import com.chiefofstaff.domain.InsightEngine
 import com.chiefofstaff.domain.PlanGenerator
 import com.chiefofstaff.domain.PredictionLedger
 import com.chiefofstaff.domain.ReductionEngine
@@ -103,6 +104,7 @@ class AppContainer(context: Context) {
     val anticipationEngine: AnticipationEngine by lazy { AnticipationEngine(repo, clock) }
     val consistencyScore: ConsistencyScore by lazy { ConsistencyScore(repo, clock) }
     val reductionEngine: ReductionEngine by lazy { ReductionEngine(repo, clock, stateMachine) }
+    val insightEngine: InsightEngine by lazy { InsightEngine(repo, clock) }
 
     // --- Capture ---
     private val factWriter: FactWriter by lazy { FactWriter(repo, clock) }
