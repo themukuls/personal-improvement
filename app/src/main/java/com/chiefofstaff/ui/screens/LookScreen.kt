@@ -155,7 +155,7 @@ fun LookScreen(
             }
         }
         CollapsedSection("HORIZONS", LookSection.HORIZONS, state, onToggleSection) {
-            if (state.horizonGoals.isEmpty() && state.weekAttribution.isEmpty() && state.drift.isEmpty()) {
+            if (state.horizonGoals.isEmpty() && state.weekAttribution.isEmpty() && state.drift.isEmpty() && state.projections.isEmpty()) {
                 Text("Weekly, monthly and quarterly horizons form as goals accrue.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -171,6 +171,10 @@ fun LookScreen(
                     if (state.drift.isNotEmpty()) {
                         SectionLabel("DRIFT")
                         state.drift.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.Accent) }
+                    }
+                    if (state.projections.isNotEmpty()) {
+                        SectionLabel("ON CURRENT PACE")
+                        state.projections.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted) }
                     }
                 }
             }

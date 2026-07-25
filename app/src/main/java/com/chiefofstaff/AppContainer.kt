@@ -21,6 +21,7 @@ import com.chiefofstaff.domain.HorizonEngine
 import com.chiefofstaff.domain.InsightEngine
 import com.chiefofstaff.domain.PlanGenerator
 import com.chiefofstaff.domain.PredictionLedger
+import com.chiefofstaff.domain.ProjectionEngine
 import com.chiefofstaff.domain.ReductionEngine
 import com.chiefofstaff.domain.RuleEngine
 import com.chiefofstaff.intervention.EveningClose
@@ -111,6 +112,7 @@ class AppContainer(context: Context) {
     val reductionEngine: ReductionEngine by lazy { ReductionEngine(repo, clock, stateMachine) }
     val insightEngine: InsightEngine by lazy { InsightEngine(repo, clock) }
     val horizonEngine: HorizonEngine by lazy { HorizonEngine(repo, clock) }
+    val projectionEngine: ProjectionEngine by lazy { ProjectionEngine(repo, clock) }
 
     // --- Capture ---
     private val factWriter: FactWriter by lazy { FactWriter(repo, clock) }
@@ -129,7 +131,7 @@ class AppContainer(context: Context) {
     val eveningClose: EveningClose by lazy { EveningClose(repo, clock, stateMachine, orchestrator, notifier) }
     val weeklyAudit: WeeklyAudit by lazy { WeeklyAudit(repo, clock, orchestrator, consistencyScore, ledger, insightEngine, notifier) }
     val middayPulse: MiddayPulse by lazy { MiddayPulse(repo, clock, notifier) }
-    val periodReview: PeriodReview by lazy { PeriodReview(repo, clock, consistencyScore, horizonEngine, notifier) }
+    val periodReview: PeriodReview by lazy { PeriodReview(repo, clock, consistencyScore, horizonEngine, projectionEngine, reductionEngine, notifier) }
     val ritualScheduler: RitualScheduler by lazy { RitualScheduler(appContext, clock) }
 
     // --- System ---

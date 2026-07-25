@@ -64,6 +64,10 @@ interface CommitmentDao {
     )
     suspend fun dormantBefore(cutoff: Long): List<Commitment>
 
+    /** RES-10 — commitments long archived, candidates for the annual pruning proposal. */
+    @Query("SELECT * FROM commitment WHERE state = 'AUTO_ARCHIVED' AND updatedAt < :cutoff")
+    suspend fun archivedBefore(cutoff: Long): List<Commitment>
+
     @Query("SELECT COUNT(*) FROM commitment WHERE state = 'DONE' AND updatedAt >= :since")
     suspend fun doneCountSince(since: Long): Int
 

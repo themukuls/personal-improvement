@@ -54,6 +54,7 @@ data class LookUiState(
     val weekAttribution: List<String> = emptyList(),
     val drift: List<String> = emptyList(),
     val weekLoad: Int = 0,
+    val projections: List<String> = emptyList(),
 )
 
 data class ReferenceRow(val label: String, val value: String, val sub: String, val emergency: Boolean)
@@ -119,6 +120,7 @@ class LookViewModel(private val container: AppContainer) : ViewModel() {
                 weekAttribution = container.horizonEngine.weekAttribution(),
                 drift = container.horizonEngine.drift(),
                 weekLoad = container.horizonEngine.weekLoad(),
+                projections = container.projectionEngine.projectionLines(90),   // DIR-16
             )
         }
     }

@@ -64,6 +64,7 @@ class NightlyBatchWorker(c: Context, p: WorkerParameters) : ContainerWorker(c, p
                 if (today.dayOfMonth == 1) {
                     periodReview.run("Monthly")
                     if (today.monthValue in listOf(1, 4, 7, 10)) periodReview.run("Quarterly")
+                    if (today.monthValue == 1) periodReview.run("Annual")   // REV-11
                 }
             }
             val archived = stateMachine.autoArchiveDormant()

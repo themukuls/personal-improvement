@@ -83,6 +83,9 @@ interface GraphDao {
     @Query("SELECT * FROM reference_item ORDER BY type") fun references(): Flow<List<ReferenceItem>>
     @Query("SELECT * FROM reference_item WHERE expiresAt IS NOT NULL AND expiresAt <= :horizon")
     suspend fun expiringBefore(horizon: Long): List<ReferenceItem>
+    /** RES-10 — references that expired before a cutoff, for the annual pruning proposal. */
+    @Query("SELECT * FROM reference_item WHERE expiresAt IS NOT NULL AND expiresAt < :cutoff")
+    suspend fun expiredBefore(cutoff: Long): List<ReferenceItem>
 
     // Events (calendar).
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertEvent(e: EventEntity): Long

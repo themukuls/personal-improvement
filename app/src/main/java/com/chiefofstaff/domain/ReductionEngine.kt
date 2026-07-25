@@ -54,6 +54,24 @@ class ReductionEngine(
         AppLog.i("reduce", "dropped ${item.kind} #${item.id}")
     }
 
+    /**
+     * RES-10 — the annual pruning proposal. Once a year the assistant looks at what has quietly
+     * accumulated and offers to let it go: long-archived commitments, goals abandoned months ago,
+     * references that expired long ago. Deterministic counts only — the offer is a summary, never an
+     * automatic deletion (P10/RES-06). Returns neutral lines; empty if there's nothing to prune.
+     */
+    suspend fun annualPruningProposal(): List<String> {
+        val now = clock.now()
+        val out = mutableListOf<String>()
+        val archived = repo.commitments.archivedBefore(now.minusSeconds(365L * 86_400).toEpochMilli()).size
+        if (archived > 0) out += "$archived commitment(s) archived over a year ago"
+        val staleGoals = repo.graph.staleGoals(now.minusSeconds(180L * 86_400).toEpochMilli()).size
+        if (staleGoals > 0) out += "$staleGoals goal(s) untouched for 6+ months"
+        val expired = repo.graph.expiredBefore(now.minusSeconds(365L * 86_400).toEpochMilli()).size
+        if (expired > 0) out += "$expired reference(s) expired over a year ago"
+        return out
+    }
+
     /** RES-02 — how many open commitments each activated domain is carrying. */
     suspend fun openCountsByDomain(): Map<Domain, Int> =
         repo.commitments.openCommitmentsNow()
