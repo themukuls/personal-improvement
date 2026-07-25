@@ -70,6 +70,6 @@ fun BottomBar(
             }
         }
         Spacer(Modifier.width(14.dp))
-        HoldToTalkButton(onHoldStart = onHoldStart, onHoldEnd = onHoldEnd, onLongPress = onSessionToggle)
+        HoldToTalkButton(onHoldStart = onHoldStart, onHoldEnd = onHoldEnd, onDoubleTap = onSessionToggle)
     }
 }

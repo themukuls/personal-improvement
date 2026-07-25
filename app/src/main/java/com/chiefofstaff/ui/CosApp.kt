@@ -84,7 +84,7 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
                     onSelect = { current = it },
                     onHoldStart = { listening = true; speech.start() },
                     onHoldEnd = { speech.stop() },
-                    // CNV-13 — long-press toggles a continuous hands-free session.
+                    // CNV-13 — double-tap toggles a continuous hands-free session.
                     onSessionToggle = {
                         if (inSession) { speech.stop(); listening = false }
                         else { listening = true; speech.startContinuous() }
