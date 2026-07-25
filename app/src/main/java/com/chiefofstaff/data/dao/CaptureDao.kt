@@ -12,12 +12,9 @@ import kotlinx.coroutines.flow.Flow
 interface CaptureDao {
     @Insert suspend fun insert(capture: Capture): Long
 
-    /**
-     * Populate the external-content FTS index for a stored capture. Captures are immutable (P5),
-     * so index rows are insert-only — no update/delete upkeep. Call right after [insert].
-     */
-    @Query("INSERT INTO capture_fts(docid, rawContent) VALUES (:id, :content)")
-    suspend fun index(id: Long, content: String)
+    // The FTS index (capture_fts) is kept in sync automatically by SQLite triggers created in the
+    // database callback (see CoSDatabase). Captures are immutable (P5), so in practice only the
+    // AFTER INSERT trigger ever fires — no manual indexing call is needed here.
 
     @Query("SELECT * FROM capture WHERE parsed = 0 ORDER BY createdAt ASC")
     suspend fun unparsed(): List<Capture>

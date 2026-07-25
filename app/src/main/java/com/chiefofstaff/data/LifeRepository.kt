@@ -31,11 +31,10 @@ class LifeRepository(
     // --- Capture (immutable, always indexed) ---
     suspend fun capture(source: CaptureSource, raw: String, mediaPath: String? = null): Long {
         val now = clock.now()
-        val id = captures.insert(
+        // The AFTER INSERT trigger on `capture` mirrors the row into the FTS index automatically.
+        return captures.insert(
             Capture(source = source, createdAt = now, rawContent = raw, mediaPath = mediaPath)
         )
-        captures.index(id, raw)
-        return id
     }
 
     fun recentCaptures(limit: Int = 100): Flow<List<Capture>> = captures.recent(limit)

@@ -33,6 +33,7 @@ import com.chiefofstaff.data.entity.RuleEntity
 import com.chiefofstaff.data.entity.Session
 import com.chiefofstaff.data.entity.ValueStatement
 import com.chiefofstaff.data.entity.WaitingOn
+import androidx.sqlite.db.SupportSQLiteDatabase
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 @Database(
@@ -68,7 +69,33 @@ abstract class CoSDatabase : RoomDatabase() {
             val factory = SupportOpenHelperFactory(passphrase)
             return Room.databaseBuilder(context, CoSDatabase::class.java, "cos.db")
                 .openHelperFactory(factory)
+                .addCallback(FtsSyncCallback)
                 .build()
+        }
+
+        /**
+         * Keeps the external-content FTS table [CaptureFts] in sync with [Capture] via SQLite
+         * triggers, the standard pattern for contentless/external-content FTS4. Captures are
+         * immutable (P5) so only the AFTER INSERT trigger fires in practice, but the delete/update
+         * triggers are declared for correctness. Room creates the virtual table before onCreate
+         * runs, so the triggers can reference it here.
+         */
+        private object FtsSyncCallback : RoomDatabase.Callback() {
+            override fun onCreate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TRIGGER IF NOT EXISTS capture_fts_ai AFTER INSERT ON capture BEGIN " +
+                        "INSERT INTO capture_fts(docid, rawContent) VALUES (new.rowid, new.rawContent); END;"
+                )
+                db.execSQL(
+                    "CREATE TRIGGER IF NOT EXISTS capture_fts_ad AFTER DELETE ON capture BEGIN " +
+                        "INSERT INTO capture_fts(capture_fts, docid, rawContent) VALUES('delete', old.rowid, old.rawContent); END;"
+                )
+                db.execSQL(
+                    "CREATE TRIGGER IF NOT EXISTS capture_fts_au AFTER UPDATE ON capture BEGIN " +
+                        "INSERT INTO capture_fts(capture_fts, docid, rawContent) VALUES('delete', old.rowid, old.rawContent); " +
+                        "INSERT INTO capture_fts(docid, rawContent) VALUES (new.rowid, new.rawContent); END;"
+                )
+            }
         }
     }
 }
