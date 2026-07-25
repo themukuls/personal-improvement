@@ -21,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.chiefofstaff.data.model.Domain
+import com.chiefofstaff.domain.ReductionEngine
 import com.chiefofstaff.ui.components.NeuCard
 import com.chiefofstaff.ui.components.SectionLabel
 import com.chiefofstaff.ui.theme.Mono
@@ -40,6 +42,8 @@ fun LookScreen(
     onQuery: (String) -> Unit,
     onToggleSection: (LookSection) -> Unit,
     onSetQuiet: (Int?) -> Unit,
+    onDrop: (ReductionEngine.ReductionItem) -> Unit,
+    onBankruptcy: (Domain) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -111,7 +115,33 @@ fun LookScreen(
             }
         }
         CollapsedSection("DOMAINS", LookSection.DOMAINS, state, onToggleSection) {
-            Text("Health · Work · Money · People · Home — activate as you go.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (state.domainCounts.isEmpty()) {
+                    Text("Nothing open. Domains fill as you go.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+                }
+                // RES-02 — per-domain backlog with one-action bankruptcy.
+                state.domainCounts.forEach { (domain, count) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "${domain.name.lowercase().replaceFirstChar { it.uppercase() }} — $count open",
+                            style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted,
+                            modifier = Modifier.weight(1f),
+                        )
+                        QuietChip("Clear backlog") { onBankruptcy(domain) }
+                    }
+                }
+                // RES-04 — the assistant's own reduction proposals.
+                if (state.proposals.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    SectionLabel("SUGGEST DROPPING")
+                    state.proposals.forEach { item ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(item.label, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted, modifier = Modifier.weight(1f))
+                            QuietChip("Drop") { onDrop(item) }
+                        }
+                    }
+                }
+            }
         }
         CollapsedSection("PEOPLE", LookSection.PEOPLE, state, onToggleSection) {
             Text("People appear once people exist.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)

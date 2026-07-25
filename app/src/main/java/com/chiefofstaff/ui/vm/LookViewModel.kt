@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chiefofstaff.AppContainer
 import com.chiefofstaff.data.entity.Capture
+import com.chiefofstaff.data.model.Domain
+import com.chiefofstaff.domain.ReductionEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -23,6 +25,9 @@ data class LookUiState(
     val healthLines: List<String> = emptyList(),
     // INT-08 — quiet mode state.
     val quietActive: Boolean = false,
+    // RES-02/04 — anti-burden.
+    val proposals: List<ReductionEngine.ReductionItem> = emptyList(),
+    val domainCounts: Map<Domain, Int> = emptyMap(),
 )
 
 /**
@@ -56,7 +61,32 @@ class LookViewModel(private val container: AppContainer) : ViewModel() {
         when (next) {
             LookSection.TIMELINE -> loadTimeline()
             LookSection.TRENDS -> loadTrends()
+            LookSection.DOMAINS -> loadReduction()
             else -> Unit
+        }
+    }
+
+    /** RES-02/04 — load the domain backlog counts and the reduction proposals. */
+    private fun loadReduction() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                domainCounts = container.reductionEngine.openCountsByDomain(),
+                proposals = container.reductionEngine.proposals(),
+            )
+        }
+    }
+
+    fun drop(item: ReductionEngine.ReductionItem) {
+        viewModelScope.launch {
+            container.reductionEngine.drop(item)
+            loadReduction()
+        }
+    }
+
+    fun declareBankruptcy(domain: Domain) {
+        viewModelScope.launch {
+            container.reductionEngine.declareBankruptcy(domain)
+            loadReduction()
         }
     }
 

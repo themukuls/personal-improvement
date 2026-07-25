@@ -30,6 +30,16 @@ interface CommitmentDao {
     )
     fun openCommitments(): Flow<List<Commitment>>
 
+    /** Snapshot of open commitments (for reduction/bankruptcy grouping). */
+    @Query(
+        """
+        SELECT * FROM commitment
+        WHERE state IN ('CAPTURED','SCHEDULED','DUE','ASKED','DEFERRED','RECOMMITTED')
+        ORDER BY domain
+        """
+    )
+    suspend fun openCommitmentsNow(): List<Commitment>
+
     /** The Close card stack: everything due today that hasn't reached a verdict yet. */
     @Query(
         """
