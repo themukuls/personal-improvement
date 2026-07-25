@@ -53,6 +53,10 @@ interface CaptureDao {
     @Query("SELECT * FROM review_queue WHERE resolved = 0 ORDER BY createdAt ASC")
     fun openReviews(): Flow<List<ReviewQueueItem>>
 
+    /** MEM-14 — snapshot of open review items for the nightly re-parse. */
+    @Query("SELECT * FROM review_queue WHERE resolved = 0 ORDER BY createdAt ASC")
+    suspend fun openReviewsNow(): List<ReviewQueueItem>
+
     @Query("UPDATE review_queue SET resolved = 1 WHERE id = :id")
     suspend fun resolveReview(id: Long)
 

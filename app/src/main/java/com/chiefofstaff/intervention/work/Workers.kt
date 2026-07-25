@@ -41,7 +41,31 @@ class NightlyBatchWorker(c: Context, p: WorkerParameters) : ContainerWorker(c, p
             runCatching { screenTimeSync.sync() }      // CAP-09 passive screen-time
             runCatching { insightEngine.computeAndStoreDayLoad() }  // RES-07 load score
             extractionPipeline.processBacklog()
+            runCatching { extractionPipeline.reparseReviewQueue() } // MEM-14 nightly re-parse
             anticipationEngine.runNightlyScan()
+
+            // ACC-12 — flag any claimed-but-contradicted completions as a quiet note.
+            runCatching {
+                val contradictions = insightEngine.sensorContradictions()
+                if (contradictions.isNotEmpty()) {
+                    repo.graph.insertNote(
+                        com.chiefofstaff.data.entity.Note(
+                            text = contradictions.joinToString("; "),
+                            tags = listOf("sensor_flag"),
+                            createdAt = clock.now(),
+                        )
+                    )
+                }
+            }
+
+            // REV-07 monthly retro / REV-10 quarterly review on period boundaries.
+            runCatching {
+                val today = clock.today()
+                if (today.dayOfMonth == 1) {
+                    periodReview.run("Monthly")
+                    if (today.monthValue in listOf(1, 4, 7, 10)) periodReview.run("Quarterly")
+                }
+            }
             val archived = stateMachine.autoArchiveDormant()
             if (archived.isNotEmpty()) {
                 // RES-01 — one notification listing what was archived, no shame.

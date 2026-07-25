@@ -35,6 +35,7 @@ class OpenCommitmentsProvider(private val repo: LifeRepository, private val cloc
     override val key = "open_commitments"
     override suspend fun render(params: Map<String, Any?>, budgetTokens: Int): String {
         val list = repo.commitments.openCommitments().first()
+            .filterNot { EgressPolicy.isLocalOnly(it.domain) }   // SYS-19 per-domain egress
         val lines = list.map { c ->
             val t = c.dueAt?.let { hhmm(it, clock.zone()) } ?: "wait"
             "$t ${c.what} | domain=${c.domain} energy=${c.energyCost} defer=${c.deferralCount}"
@@ -124,12 +125,24 @@ class TopAnticipationProvider(private val repo: LifeRepository, private val cloc
     }
 }
 
+/** DIR-14 — recent decisions as analogues, so Decide-mode can reason against past choices. */
+class RecentDecisionsProvider(private val repo: LifeRepository) : ContextProvider {
+    override val key = "recent_decisions"
+    override suspend fun render(params: Map<String, Any?>, budgetTokens: Int): String {
+        val lines = repo.graph.recentDecisions(10).map { d ->
+            "Q: ${d.question} → ${d.chosen}" + (d.actualOutcome?.let { " [outcome: $it]" } ?: "")
+        }
+        return clampToBudget(lines, budgetTokens)
+    }
+}
+
 /** Factory assembling every provider for a repository. Providers not backed by the graph are
  *  simple [ParamProvider]s populated by the caller of the task. */
 object ContextProviders {
     fun all(repo: LifeRepository, clock: Clock): List<ContextProvider> = listOf(
         CalendarProvider(repo, clock),
         OpenCommitmentsProvider(repo, clock),
+        RecentDecisionsProvider(repo),
         DueCommitmentsProvider(repo, clock),
         ActiveRulesProvider(repo),
         CurrentStateProvider(repo, clock),

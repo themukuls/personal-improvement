@@ -3,6 +3,8 @@ package com.chiefofstaff.domain
 import com.chiefofstaff.core.Clock
 import com.chiefofstaff.data.LifeRepository
 import com.chiefofstaff.data.entity.Commitment
+import com.chiefofstaff.data.model.CommitmentState
+import com.chiefofstaff.data.model.Domain
 import com.chiefofstaff.data.model.EnergyCost
 import java.time.Duration
 import java.time.LocalTime
@@ -64,6 +66,22 @@ class InsightEngine(
         val overdueWaiting = repo.commitments.overdueWaiting(clock.now().toEpochMilli())
             .map { "${it.what} from ${it.who} — overdue and open." }
         return stalled + overdueWaiting
+    }
+
+    /**
+     * ACC-12 — sensor contradiction: a movement commitment marked done today, but the step count
+     * says otherwise. Surfaced quietly (a flag, never an accusation) — the sensor might be wrong too.
+     */
+    suspend fun sensorContradictions(): List<String> {
+        val since = clock.today().atStartOfDay(clock.zone()).toInstant().toEpochMilli()
+        val movementWords = listOf("gym", "walk", "run", "steps", "workout", "jog")
+        val claimed = repo.commitments.changedSince(since)
+            .filter { it.state == CommitmentState.DONE && it.domain == Domain.HEALTH }
+            .filter { c -> movementWords.any { c.what.lowercase().contains(it) } }
+        if (claimed.isEmpty()) return emptyList()
+        val steps = repo.graph.observations("steps", 1).firstOrNull()?.value ?: return emptyList()
+        if (steps >= 2000) return emptyList()
+        return claimed.map { "\"${it.what}\" is marked done, but only ${steps.toInt()} steps are logged today." }
     }
 
     private fun weight(c: Commitment): Double {

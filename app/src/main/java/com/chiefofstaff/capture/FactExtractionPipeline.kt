@@ -62,6 +62,33 @@ class FactExtractionPipeline(
         repo.captures.unparsed().forEach { processCapture(it.id) }
     }
 
+    /**
+     * MEM-14 — nightly re-parse: re-run extraction on captures still sitting in the review queue,
+     * now that prompts may have improved. If the capture parses cleanly this time, resolve its
+     * review item. Every capture records the prompt_version that parsed it (§6.4), so this is a
+     * safe, improving pass rather than a destructive one.
+     */
+    suspend fun reparseReviewQueue() {
+        repo.captures.openReviewsNow().forEach { review ->
+            val capture = repo.captures.byId(review.captureId) ?: return@forEach
+            // Mark as unparsed conceptually by re-running the extractor against the raw content.
+            val result = orchestrator.run(
+                TaskId.EXTRACT_FACTS,
+                params = mapOf("raw" to "RAW_CAPTURE\n${capture.rawContent}"),
+            )
+            if (result is LlmOrchestrator.TaskResult.Structured) {
+                val facts = runCatching { result.obj["facts"]?.jsonArray }.getOrNull().orEmpty()
+                var written = 0
+                for (element in facts) if (factWriter.write(element.jsonObject, sourceCaptureId = capture.id)) written++
+                if (written > 0) {
+                    repo.captures.resolveReview(review.id)
+                    repo.captures.markParsed(capture.id, result.promptVersion ?: "?", confidence = 1f)
+                    AppLog.i("reparse", "capture ${capture.id} resolved on re-parse (+$written facts)")
+                }
+            }
+        }
+    }
+
     private suspend fun enqueueReview(captureId: Long, reason: ReviewReason, detail: String?) {
         repo.captures.enqueueReview(
             ReviewQueueItem(captureId = captureId, reason = reason, detail = detail, createdAt = clock.now())
