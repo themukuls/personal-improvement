@@ -46,6 +46,7 @@ fun LookScreen(
     onBankruptcy: (Domain) -> Unit,
     onChase: (Long) -> Unit,
     onResolveWaiting: (Long) -> Unit,
+    onLogContact: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -166,7 +167,27 @@ fun LookScreen(
             }
         }
         CollapsedSection("PEOPLE", LookSection.PEOPLE, state, onToggleSection) {
-            Text("People appear once people exist.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+            if (state.people.isEmpty()) {
+                Text("People appear once people exist.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    state.people.forEach { p ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(p.name, style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
+                                if (p.sub.isNotBlank()) {
+                                    Text(
+                                        p.sub,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (p.overdue) Palette.Accent else Palette.InkFaint,
+                                    )
+                                }
+                            }
+                            QuietChip("Log contact") { onLogContact(p.id) }
+                        }
+                    }
+                }
+            }
         }
         CollapsedSection("DECISIONS", LookSection.DECISIONS, state, onToggleSection) {
             if (state.decisions.isEmpty()) {

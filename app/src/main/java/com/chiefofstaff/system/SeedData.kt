@@ -96,6 +96,20 @@ class SeedData(
             )
         )
 
+        // DOM-15 — a couple of people with cadence; Amma is overdue (feeds neglect detection).
+        repo.graph.insertPerson(
+            com.chiefofstaff.data.entity.Person(
+                name = "Amma", relationship = "family", importance = 5,
+                lastContact = now.minusSeconds(12L * 86_400), cadenceTargetDays = 7, createdAt = now,
+            )
+        )
+        repo.graph.insertPerson(
+            com.chiefofstaff.data.entity.Person(
+                name = "Rakesh", relationship = "colleague", importance = 3,
+                lastContact = now.minusSeconds(2L * 86_400), cadenceTargetDays = 14, createdAt = now,
+            )
+        )
+
         // The single anticipation card (LOOKING AHEAD).
         repo.state.insertAnticipation(
             AnticipationItem(

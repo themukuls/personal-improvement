@@ -62,6 +62,21 @@ class LifeRepository(
         commitments.updateWaiting(w.copy(state = com.chiefofstaff.data.model.LoopState.RESOLVED, lastTouchedAt = clock.now()))
     }
 
+    // DOM-15 / MEM-09 — people layer: contact cadence and logging an interaction.
+    fun people(): Flow<List<com.chiefofstaff.data.entity.Person>> = graph.people()
+
+    suspend fun logContact(personId: Long) {
+        val p = graph.personById(personId) ?: return
+        val now = clock.now()
+        graph.updatePerson(p.copy(lastContact = now))
+        graph.insertInteraction(
+            com.chiefofstaff.data.entity.Interaction(
+                personId = personId, whenAt = now, channel = "manual",
+                summary = "Logged contact", createdAt = now,
+            )
+        )
+    }
+
     // --- Mode + day state ---
     fun modeFlow(): Flow<ModeState?> = state.modeFlow()
 

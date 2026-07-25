@@ -48,6 +48,8 @@ interface GraphDao {
     suspend fun findPerson(name: String): Person?
     @Query("SELECT * FROM person WHERE cadenceTargetDays IS NOT NULL")
     suspend fun peopleWithCadence(): List<Person>
+    @Query("SELECT * FROM person WHERE id = :id")
+    suspend fun personById(id: Long): Person?
 
     @Insert suspend fun insertInteraction(i: Interaction): Long
     @Query("SELECT * FROM interaction WHERE personId = :personId ORDER BY whenAt DESC")

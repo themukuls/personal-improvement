@@ -120,6 +120,7 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
                             onBankruptcy = lookVm::declareBankruptcy,
                             onChase = lookVm::chase,
                             onResolveWaiting = lookVm::resolveWaiting,
+                            onLogContact = lookVm::logContact,
                         )
                     }
                 }

@@ -32,7 +32,11 @@ data class LookUiState(
     val decisions: List<DecisionRow> = emptyList(),
     // MEM-11 — waiting-on register.
     val waiting: List<WaitingRow> = emptyList(),
+    // DOM-15 / MEM-09 — people layer.
+    val people: List<PeopleRow> = emptyList(),
 )
+
+data class PeopleRow(val id: Long, val name: String, val sub: String, val overdue: Boolean)
 
 data class DecisionRow(val question: String, val chosen: String, val reviewLabel: String, val hasOutcome: Boolean)
 data class WaitingRow(val id: Long, val what: String, val who: String, val context: String)
@@ -71,8 +75,33 @@ class LookViewModel(private val container: AppContainer) : ViewModel() {
             LookSection.DOMAINS -> loadReduction()
             LookSection.DECISIONS -> loadDecisions()
             LookSection.WAITING -> loadWaiting()
+            LookSection.PEOPLE -> loadPeople()
             else -> Unit
         }
+    }
+
+    /** DOM-15 / MEM-09 — people with cadence status; overdue = past the target contact interval. */
+    private fun loadPeople() {
+        viewModelScope.launch {
+            val now = container.clock.now()
+            val rows = container.repo.people().first().map { p ->
+                val cadence = p.cadenceTargetDays
+                val last = p.lastContact
+                val days = last?.let { java.time.Duration.between(it, now).toDays() }
+                val overdue = cadence != null && days != null && days > cadence
+                val sub = buildString {
+                    p.relationship?.let { append(it) }
+                    if (days != null) { if (isNotEmpty()) append(" · "); append("last $days d ago") }
+                    if (cadence != null) { if (isNotEmpty()) append(" · "); append("every $cadence d") }
+                }
+                PeopleRow(p.id, p.name, sub, overdue)
+            }
+            _state.value = _state.value.copy(people = rows)
+        }
+    }
+
+    fun logContact(id: Long) {
+        viewModelScope.launch { container.repo.logContact(id); loadPeople() }
     }
 
     /** MEM-11 — load the waiting-on register (what others owe you). */
