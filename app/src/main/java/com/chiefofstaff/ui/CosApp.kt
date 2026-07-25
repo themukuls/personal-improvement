@@ -97,7 +97,7 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
                     }
                     Destination.Talk -> {
                         val s by talkVm.state.collectAsStateWithLifecycle()
-                        TalkScreen(state = s, onSend = talkVm::send)
+                        TalkScreen(state = s, onSend = talkVm::send, onSetMode = talkVm::setMode, onSave = talkVm::saveToMemory)
                     }
                     Destination.Close -> {
                         val s by closeVm.state.collectAsStateWithLifecycle()

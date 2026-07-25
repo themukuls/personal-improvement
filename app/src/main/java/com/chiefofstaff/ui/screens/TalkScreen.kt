@@ -1,5 +1,9 @@
 package com.chiefofstaff.ui.screens
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,9 +30,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.chiefofstaff.data.model.ConversationMode
 import com.chiefofstaff.ui.components.NeuButton
 import com.chiefofstaff.ui.components.NeuCard
 import com.chiefofstaff.ui.theme.Palette
@@ -46,6 +52,8 @@ import com.chiefofstaff.ui.vm.TalkUiState
 fun TalkScreen(
     state: TalkUiState,
     onSend: (String) -> Unit,
+    onSetMode: (ConversationMode) -> Unit,
+    onSave: (ChatLine) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var input by remember { mutableStateOf("") }
@@ -56,6 +64,7 @@ fun TalkScreen(
     }
 
     Column(modifier = modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+        ModeRow(current = state.mode, onSetMode = onSetMode)
         if (state.lines.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Text(
@@ -66,7 +75,7 @@ fun TalkScreen(
             }
         } else {
             LazyColumn(state = listState, modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(state.lines) { line -> ChatBubble(line) }
+                items(state.lines) { line -> ChatBubble(line, onSave) }
                 if (state.thinking) {
                     item { Text("…", style = MaterialTheme.typography.titleLarge, color = Palette.InkFaint, modifier = Modifier.padding(8.dp)) }
                 }
@@ -100,14 +109,52 @@ fun TalkScreen(
 }
 
 @Composable
-private fun ChatBubble(line: ChatLine) {
+private fun ModeRow(current: ConversationMode, onSetMode: (ConversationMode) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ConversationMode.entries.forEach { mode ->
+            val active = mode == current
+            Text(
+                text = mode.name.lowercase().replaceFirstChar { it.uppercase() },
+                style = MaterialTheme.typography.labelLarge,
+                color = if (active) Palette.Ink else Palette.InkFaint,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .then(if (active) Modifier.neuSurface(cornerRadius = 14, elevation = 5.dp, pressed = true) else Modifier)
+                    .clickable { onSetMode(mode) }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChatBubble(line: ChatLine, onSave: (ChatLine) -> Unit) {
     val isUser = line.role == "user"
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start) {
+    Column(horizontalAlignment = if (isUser) Alignment.End else Alignment.Start, modifier = Modifier.fillMaxWidth()) {
         NeuCard(modifier = Modifier.widthIn(max = 300.dp)) {
             Text(
                 line.text,
                 style = MaterialTheme.typography.bodyLarge,
                 color = if (isUser) Palette.Ink else Palette.InkMuted,
+            )
+        }
+        // CNV-04 — one-tap fact emission on assistant replies.
+        if (!isUser) {
+            Text(
+                text = if (line.saved) "saved ✓" else "Save to memory",
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (line.saved) Palette.Accent else Palette.InkFaint,
+                modifier = Modifier
+                    .padding(top = 4.dp, start = 4.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .then(if (line.saved) Modifier else Modifier.clickable { onSave(line) })
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
             )
         }
     }
