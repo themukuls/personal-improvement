@@ -125,6 +125,12 @@ class LifeRepository(
         state.upsertDay(d.copy(energy = energy.coerceIn(1, 5), updatedAt = clock.now()))
     }
 
+    /** CAP-10 sibling — the daily mood check-in (key from EmotionalEngine.MOODS). */
+    suspend fun setMood(mood: String) {
+        val d = today()
+        state.upsertDay(d.copy(mood = mood, updatedAt = clock.now()))
+    }
+
     /** FTS MATCH is picky about punctuation; keep alnum tokens and OR them for forgiving recall. */
     private fun sanitizeFts(query: String): String =
         query.split(Regex("\\s+"))

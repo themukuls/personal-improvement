@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(.\\\\gradlew.bat assembleDebug --stacktrace 2>&1)",
+      "PowerShell(java -version)",
+      "PowerShell($env:JAVA_HOME)",
+      "PowerShell($j = \\(Get-Command java\\).Source; Write-Output \"java on PATH: $j\"; Write-Output \"--- resolved home ---\"; $home21 = Split-Path \\(Split-Path $j -Parent\\) -Parent; Write-Output $home21; Write-Output \"--- installed JDKs under Program Files ---\"; Get-ChildItem \"C:\\\\Program Files\\\\Eclipse Adoptium\",\"C:\\\\Program Files\\\\Java\" -ErrorAction SilentlyContinue | Select-Object FullName)",
+      "PowerShell(.\\\\gradlew.bat assembleDebug 2>&1)",
+      "PowerShell($adb = \\(Get-Command adb -ErrorAction SilentlyContinue\\).Source; if \\(-not $adb\\) { $adb = Join-Path $env:LOCALAPPDATA \"Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" }; if \\(Test-Path $adb\\) { Write-Output \"adb: $adb\"; & $adb devices } else { Write-Output \"adb not found on PATH or default SDK location\" })"
+    ]
+  }
+}

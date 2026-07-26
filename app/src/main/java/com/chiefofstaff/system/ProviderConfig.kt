@@ -32,4 +32,9 @@ class ProviderConfig(context: Context) {
     var grokKey: String
         get() = prefs.getString("grok_api_key", "").orEmpty()
         set(v) { prefs.edit().putString("grok_api_key", v).apply() }
+
+    /** Groq (groq.com) — an OpenAI-compatible endpoint serving fast open models (Llama etc.). */
+    var groqKey: String
+        get() = prefs.getString("groq_api_key", "").orEmpty()
+        set(v) { prefs.edit().putString("groq_api_key", v).apply() }
 }

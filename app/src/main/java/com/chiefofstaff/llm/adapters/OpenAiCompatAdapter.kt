@@ -89,7 +89,10 @@ class OpenAiCompatAdapter(
             throw ProviderException("$providerName rate limited", retryable = true)
         }
         if (resp.status.value !in 200..299) {
-            throw ProviderException("$providerName http ${resp.status.value}", retryable = resp.status.value >= 500)
+            // Surface the provider's actual error body (e.g. "model_decommissioned") so failures are
+            // diagnosable instead of silently falling back to the offline stub.
+            val detail = runCatching { resp.bodyAsText() }.getOrDefault("").take(300)
+            throw ProviderException("$providerName http ${resp.status.value}: $detail", retryable = resp.status.value >= 500)
         }
 
         val root = json.parseToJsonElement(resp.bodyAsText()).jsonObject

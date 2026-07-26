@@ -8,6 +8,7 @@ import com.chiefofstaff.data.entity.Commitment
 import com.chiefofstaff.data.entity.DayState
 import com.chiefofstaff.data.model.CommitmentState
 import com.chiefofstaff.data.model.Verdict
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -26,6 +27,8 @@ data class NowItem(
 )
 
 data class NowUiState(
+    val greeting: String = "",
+    val name: String = "",
     val dateTitle: String = "",
     val statusLine: String = "",
     val rightNow: String? = null,
@@ -33,6 +36,13 @@ data class NowUiState(
     val today: List<NowItem> = emptyList(),
     val notToday: List<String> = emptyList(),
     val energyToday: Int? = null,
+    val moodToday: String? = null,
+    val supportLine: String? = null,
+    val wellbeing: Boolean = true,
+    val relationship: com.chiefofstaff.domain.RelationshipEngine.Prompt? = null,
+    val mode: com.chiefofstaff.data.model.Mode = com.chiefofstaff.data.model.Mode.NORMAL,
+    val quiet: Boolean = false,
+    val modeSetToday: Boolean = false,
     val reentryDays: Int = 0,
     val loading: Boolean = true,
 )
@@ -45,13 +55,19 @@ data class NowUiState(
 class NowViewModel(private val container: AppContainer) : ViewModel() {
     private val repo = container.repo
     private val clock = container.clock
+    private val profile = com.chiefofstaff.system.UserProfile(container.appContext)
+    private val relPrefs = container.appContext.getSharedPreferences("cos_relationship", android.content.Context.MODE_PRIVATE)
+
+    /** Bumped when the daily relationship prompt is answered, so the combined state recomputes. */
+    private val relationshipTrigger = MutableStateFlow(0)
 
     val state: StateFlow<NowUiState> = combine(
         repo.openCommitments(),
         repo.modeFlow(),
         repo.state.topAnticipationFlow(DayState.keyFor(clock.today())),
         repo.todayFlow(),
-    ) { commitments, mode, anticipation, day ->
+        relationshipTrigger,
+    ) { commitments, mode, anticipation, day, _ ->
         val zone = clock.zone()
         val today = clock.today()
         val dateTitle = "${today.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())}, " +
@@ -77,7 +93,17 @@ class NowViewModel(private val container: AppContainer) : ViewModel() {
             next?.let { append(" · next ${hhmm(it.start, zone)} ${it.title.lowercase()}") }
         }
 
+        // Emotional intelligence: a warm, non-guilt read of the day (deterministic; always available).
+        val support = container.emotionalEngine.read()
+
+        // The daily "tell & ask" prompt — one per day, suppressed once answered.
+        val answeredToday = relPrefs.getString("answered_date", "") == clock.today().toString()
+        val relationship = if (answeredToday) null else
+            runCatching { container.relationshipEngine.todaysPrompt(profile.pronouns.isNotBlank()) }.getOrNull()
+
         NowUiState(
+            greeting = greetingFor(LocalTime.ofInstant(clock.now(), zone).hour),
+            name = profile.name,
             dateTitle = dateTitle,
             statusLine = status,
             rightNow = rightNow,
@@ -85,6 +111,13 @@ class NowViewModel(private val container: AppContainer) : ViewModel() {
             today = rows,
             notToday = violations.map { it.explanation } + conflicts + listOfNotNull(overcommit),
             energyToday = day?.energy,
+            moodToday = day?.mood,
+            supportLine = support.line,
+            wellbeing = profile.wellbeingCheckins,
+            relationship = relationship,
+            mode = mode?.current ?: com.chiefofstaff.data.model.Mode.NORMAL,
+            quiet = mode?.quietUntil?.isAfter(clock.now()) == true,
+            modeSetToday = mode?.since?.isAfter(today.atStartOfDay(zone).toInstant()) == true,
             reentryDays = container.daysAway,
             loading = false,
         )
@@ -100,6 +133,51 @@ class NowViewModel(private val container: AppContainer) : ViewModel() {
     /** CAP-10 — one-gesture daily energy (1–5). Feeds minimum-viable-day + energy-aware scheduling. */
     fun setEnergy(level: Int) {
         viewModelScope.launch { repo.setEnergy(level) }
+    }
+
+    /** Daily mood check-in. Feeds the empathetic support line and the minimum-viable-day reduction. */
+    fun setMood(mood: String) {
+        viewModelScope.launch { repo.setMood(mood) }
+    }
+
+    /** §7.3 — set the operating mode for the day; affects the plan shape and notification budget. */
+    fun setMode(mode: com.chiefofstaff.data.model.Mode) {
+        viewModelScope.launch { repo.setMode(mode) }
+    }
+
+    /** INT-08 — quiet mode: suppress proactive output for the rest of today; captures still flow. */
+    fun toggleQuiet() {
+        viewModelScope.launch {
+            val until = if (state.value.quiet) null
+            else clock.today().atTime(23, 59).atZone(clock.zone()).toInstant()
+            repo.setQuietUntil(until)
+        }
+    }
+
+    /** Answer today's relationship prompt: apply its effect to memory, then retire it for the day. */
+    fun answerRelationship(promptId: String, answerIndex: Int) {
+        viewModelScope.launch {
+            val prompt = state.value.relationship?.takeIf { it.id == promptId } ?: return@launch
+            val answer = prompt.answers.getOrNull(answerIndex) ?: return@launch
+            when (val act = answer.act) {
+                is com.chiefofstaff.domain.RelationshipEngine.Act.Ack -> Unit
+                is com.chiefofstaff.domain.RelationshipEngine.Act.Note ->
+                    repo.graph.insertNote(
+                        com.chiefofstaff.data.entity.Note(text = act.text, tags = listOf("checkin"), createdAt = clock.now())
+                    )
+                is com.chiefofstaff.domain.RelationshipEngine.Act.LogContact -> repo.logContact(act.personId)
+                is com.chiefofstaff.domain.RelationshipEngine.Act.SetPronouns -> profile.pronouns = act.value
+            }
+            retireRelationship()
+        }
+    }
+
+    /** "Say more" opens Talk (handled by the screen); retire the prompt here so it doesn't nag again. */
+    fun markRelationshipAnswered() = retireRelationship()
+
+    private fun retireRelationship() {
+        relPrefs.edit().putString("answered_date", clock.today().toString()).apply()
+        relationshipTrigger.value += 1
     }
 
     fun dismissAnticipation(useful: Boolean) {
@@ -119,4 +197,12 @@ class NowViewModel(private val container: AppContainer) : ViewModel() {
 
     private fun hhmm(instant: java.time.Instant, zone: java.time.ZoneId): String =
         LocalTime.ofInstant(instant, zone).let { "%02d:%02d".format(it.hour, it.minute) }
+
+    /** Time-of-day greeting for the header. */
+    private fun greetingFor(hour: Int): String = when (hour) {
+        in 5..11 -> "Good morning"
+        in 12..16 -> "Good afternoon"
+        in 17..21 -> "Good evening"
+        else -> "Hello"
+    }
 }

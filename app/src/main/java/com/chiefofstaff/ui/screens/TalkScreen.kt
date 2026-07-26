@@ -1,8 +1,6 @@
 package com.chiefofstaff.ui.screens
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,11 +15,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,14 +26,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.chiefofstaff.data.model.ConversationMode
+import com.chiefofstaff.ui.components.CosTextField
 import com.chiefofstaff.ui.components.NeuButton
 import com.chiefofstaff.ui.components.NeuCard
 import com.chiefofstaff.ui.theme.Palette
-import com.chiefofstaff.ui.theme.neuSurface
 import com.chiefofstaff.ui.vm.ChatLine
 import com.chiefofstaff.ui.vm.TalkUiState
 
@@ -52,7 +46,6 @@ import com.chiefofstaff.ui.vm.TalkUiState
 fun TalkScreen(
     state: TalkUiState,
     onSend: (String) -> Unit,
-    onSetMode: (ConversationMode) -> Unit,
     onSave: (ChatLine) -> Unit,
     onSaveDecision: (ChatLine) -> Unit,
     modifier: Modifier = Modifier,
@@ -65,7 +58,7 @@ fun TalkScreen(
     }
 
     Column(modifier = modifier.fillMaxSize().padding(horizontal = 18.dp)) {
-        ModeRow(current = state.mode, onSetMode = onSetMode)
+        Spacer(Modifier.height(12.dp))
         if (state.lines.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Text(
@@ -89,49 +82,16 @@ fun TalkScreen(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextField(
+            CosTextField(
                 value = input,
                 onValueChange = { input = it },
-                placeholder = { Text("Say anything", color = Palette.InkGhost) },
-                singleLine = true,
-                modifier = Modifier.weight(1f).neuSurface(cornerRadius = 22, elevation = 6.dp, pressed = true),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                ),
-                keyboardActions = KeyboardActions(onSend = {
-                    onSend(input); input = ""
-                }),
+                placeholder = "Say anything",
+                modifier = Modifier.weight(1f),
+                imeAction = ImeAction.Send,
+                onImeAction = { onSend(input); input = "" },
             )
             Spacer(Modifier.padding(6.dp))
             NeuButton(text = "Send", onClick = { onSend(input); input = "" })
-        }
-    }
-}
-
-@Composable
-private fun ModeRow(current: ConversationMode, onSetMode: (ConversationMode) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        ConversationMode.entries.forEach { mode ->
-            val active = mode == current
-            Text(
-                text = mode.name.lowercase().replaceFirstChar { it.uppercase() },
-                style = MaterialTheme.typography.labelLarge,
-                color = if (active) Palette.Ink else Palette.InkFaint,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(14.dp))
-                    .then(if (active) Modifier.neuSurface(cornerRadius = 14, elevation = 5.dp, pressed = true) else Modifier)
-                    .clickable { onSetMode(mode) }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            )
         }
     }
 }

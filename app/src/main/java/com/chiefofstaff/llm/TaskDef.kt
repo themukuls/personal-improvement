@@ -11,7 +11,7 @@ enum class TaskId {
     EXTRACT_FACTS, RESOLVE_ENTITY, GENERATE_PLAN, MORNING_BRIEF, EVENING_PARSE,
     MATCH_COMMITMENTS, WEEKLY_AUDIT, ANTICIPATE, DECISION_SUPPORT, CONVERSE,
     ANSWER_QUESTION, SUMMARISE_MEETING, ESTIMATE_MEAL, DETECT_CONFLICT,
-    PROPOSE_REDUCTION, DRAFT_MESSAGE, EXPLAIN_TREND, BOOTSTRAP_INTERVIEW
+    PROPOSE_REDUCTION, DRAFT_MESSAGE, EXPLAIN_TREND, BOOTSTRAP_INTERVIEW, VOICE_COMMAND
 }
 
 data class RetryPolicy(val maxAttempts: Int = 2, val repairOnce: Boolean = true)
@@ -149,7 +149,7 @@ object Tasks {
             id = TaskId.CONVERSE,
             tier = ModelTier.FLAGSHIP,
             recipe = listOf(b("session_history", 1200), b("relevant_facts", 1000), b("active_rules", 200), b("recent_decisions", 300)),
-            promptRef = "converse@1",
+            promptRef = "converse@2",
             schemaRef = null,               // free text; a conversation is not a schema
             temperature = 0.7,
             maxOutputTokens = 800,
@@ -226,6 +226,17 @@ object Tasks {
             schemaRef = "interview_turn",
             temperature = 0.6,
             maxOutputTokens = 500,
+        ),
+        // Voice command interpreter: turns a spoken sentence into one structured action. Cheap tier,
+        // no context recipe — the utterance + current time come in as the user content.
+        TaskDef(
+            id = TaskId.VOICE_COMMAND,
+            tier = ModelTier.FLAGSHIP,   // correctness matters more than cost; the cheap tier was unreliable
+            recipe = emptyList(),
+            promptRef = "voice_command@2",
+            schemaRef = "command",
+            temperature = 0.0,
+            maxOutputTokens = 220,
         ),
     ).associateBy { it.id }
 

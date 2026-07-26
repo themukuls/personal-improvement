@@ -11,6 +11,7 @@ import com.chiefofstaff.capture.HealthConnectSync
 import com.chiefofstaff.capture.MealEstimator
 import com.chiefofstaff.capture.MeetingSummariser
 import com.chiefofstaff.capture.ScreenTimeSync
+import com.chiefofstaff.capture.VoiceCommandProcessor
 import com.chiefofstaff.core.Clock
 import com.chiefofstaff.core.SystemClock
 import com.chiefofstaff.data.CoSDatabase
@@ -18,11 +19,13 @@ import com.chiefofstaff.data.LifeRepository
 import com.chiefofstaff.domain.AnticipationEngine
 import com.chiefofstaff.domain.CommitmentStateMachine
 import com.chiefofstaff.domain.ConsistencyScore
+import com.chiefofstaff.domain.EmotionalEngine
 import com.chiefofstaff.domain.HorizonEngine
 import com.chiefofstaff.domain.InsightEngine
 import com.chiefofstaff.domain.PlanGenerator
 import com.chiefofstaff.domain.PredictionLedger
 import com.chiefofstaff.domain.ProjectionEngine
+import com.chiefofstaff.domain.RelationshipEngine
 import com.chiefofstaff.domain.ReductionEngine
 import com.chiefofstaff.domain.RuleEngine
 import com.chiefofstaff.intervention.EveningClose
@@ -78,22 +81,55 @@ class AppContainer(context: Context) {
     private val providerConfig by lazy { ProviderConfig(appContext) }
     val costTracker = CostTracker()
 
-    private val providers: List<LlmProvider> by lazy {
-        buildList {
-            providerConfig.claudeKey.takeIf { it.isNotBlank() }?.let { add(ClaudeAdapter(http, it)) }
-            providerConfig.openAiKey.takeIf { it.isNotBlank() }?.let {
-                add(OpenAiCompatAdapter(http, it, "https://api.openai.com/v1", "openai", "gpt-4o-mini", "gpt-4o"))
-            }
-            providerConfig.grokKey.takeIf { it.isNotBlank() }?.let {
-                add(OpenAiCompatAdapter(http, it, "https://api.x.ai/v1", "grok", "grok-2-mini", "grok-2"))
-            }
-            add(OfflineStubProvider())   // always last; keeps the app whole with no keys (P11)
+    /** The real (keyed) providers, read fresh from config each call so a saved key applies at once. */
+    private fun realProviders(): List<LlmProvider> = buildList {
+        providerConfig.claudeKey.takeIf { it.isNotBlank() }?.let { add(ClaudeAdapter(http, it)) }
+        providerConfig.openAiKey.takeIf { it.isNotBlank() }?.let {
+            add(OpenAiCompatAdapter(http, it, "https://api.openai.com/v1", "openai", "gpt-4o-mini", "gpt-4o"))
         }
+        providerConfig.grokKey.takeIf { it.isNotBlank() }?.let {
+            add(OpenAiCompatAdapter(http, it, "https://api.x.ai/v1", "grok", "grok-2-mini", "grok-2"))
+        }
+        providerConfig.groqKey.takeIf { it.isNotBlank() }?.let {
+            add(OpenAiCompatAdapter(http, it, "https://api.groq.com/openai/v1", "groq", "llama-3.1-8b-instant", "llama-3.3-70b-versatile"))
+        }
+    }
+
+    /** Providers for the router: current real ones, then the offline stub as a true last resort. */
+    private fun currentProviders(): List<LlmProvider> = realProviders() + OfflineStubProvider()
+
+    /**
+     * A one-shot connectivity check for the Settings screen: sends a trivial prompt to the first
+     * configured provider on both tiers and reports the exact result or error per model. This is the
+     * honest diagnosis path — conversation uses the FLAGSHIP tier, so a bad flagship model shows here.
+     */
+    suspend fun testConnection(): String {
+        val p = realProviders().firstOrNull()
+            ?: return "No API key set yet. Enter a key above, tap Save, then Test."
+        val out = StringBuilder("Provider: ${p.capabilities.name}\n")
+        for (tier in listOf(com.chiefofstaff.data.model.ModelTier.CHEAP, com.chiefofstaff.data.model.ModelTier.FLAGSHIP)) {
+            val model = p.capabilities.models[tier] ?: "—"
+            try {
+                val r = p.complete(
+                    com.chiefofstaff.llm.LlmRequest(
+                        system = "You are a helpful assistant.",
+                        messages = listOf(com.chiefofstaff.llm.LlmMessage("user", "Reply with exactly one word: working")),
+                        tier = tier,
+                        temperature = 0.0,
+                        maxTokens = 16,
+                    )
+                )
+                out.append("✓ ${tier.name} ($model): \"${r.text.trim().take(60)}\"\n")
+            } catch (e: Exception) {
+                out.append("✗ ${tier.name} ($model): ${(e.message ?: e.toString()).take(200)}\n")
+            }
+        }
+        return out.toString().trim()
     }
 
     private val assembler: ContextAssembler by lazy { ContextAssembler(ContextProviders.all(repo, clock)) }
     private val prompts: PromptRegistry by lazy { PromptRegistry.create(appContext) }
-    private val router: Router by lazy { Router(providers) }
+    private val router: Router by lazy { Router { currentProviders() } }
     private val validator = Validator()
 
     val orchestrator: LlmOrchestrator by lazy {
@@ -110,6 +146,8 @@ class AppContainer(context: Context) {
     val planGenerator: PlanGenerator by lazy { PlanGenerator(repo, clock, orchestrator, fallback, ruleEngine, ledger) }
     val anticipationEngine: AnticipationEngine by lazy { AnticipationEngine(repo, clock) }
     val consistencyScore: ConsistencyScore by lazy { ConsistencyScore(repo, clock) }
+    val emotionalEngine: EmotionalEngine by lazy { EmotionalEngine(repo, clock, consistencyScore) }
+    val relationshipEngine: RelationshipEngine by lazy { RelationshipEngine(repo, clock, consistencyScore) }
     val reductionEngine: ReductionEngine by lazy { ReductionEngine(repo, clock, stateMachine) }
     val insightEngine: InsightEngine by lazy { InsightEngine(repo, clock) }
     val horizonEngine: HorizonEngine by lazy { HorizonEngine(repo, clock) }
@@ -124,11 +162,14 @@ class AppContainer(context: Context) {
     val screenTimeSync: ScreenTimeSync by lazy { ScreenTimeSync(appContext, repo, clock) }
     val mealEstimator: MealEstimator by lazy { MealEstimator(repo, clock, orchestrator) }
     val meetingSummariser: MeetingSummariser by lazy { MeetingSummariser(repo, clock, orchestrator) }
+    val voiceCommandProcessor: VoiceCommandProcessor by lazy {
+        VoiceCommandProcessor(appContext, repo, clock, orchestrator, ritualScheduler, planGenerator, emotionalEngine)
+    }
 
     // --- Intervention ---
     val notificationBudget: NotificationBudget by lazy { NotificationBudget(appContext, repo, clock) }
     val notifier: Notifier by lazy { Notifier(appContext, notificationBudget) }
-    private val tts: TtsSpeaker by lazy { TtsSpeaker(appContext) }
+    val tts: TtsSpeaker by lazy { TtsSpeaker(appContext) }
     val morningBrief: MorningBrief by lazy { MorningBrief(repo, clock, orchestrator, fallback, tts, notifier, calendarSync) }
     val eveningClose: EveningClose by lazy { EveningClose(repo, clock, stateMachine, orchestrator, notifier) }
     val weeklyAudit: WeeklyAudit by lazy { WeeklyAudit(repo, clock, orchestrator, consistencyScore, ledger, insightEngine, notifier) }

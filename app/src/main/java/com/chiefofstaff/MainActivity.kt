@@ -1,23 +1,28 @@
 package com.chiefofstaff
 
-import android.Manifest
 import android.content.Intent
-import android.os.Build
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
 import com.chiefofstaff.intervention.RitualForegroundService
+import com.chiefofstaff.system.Permissions
 import com.chiefofstaff.ui.CosApp
+import com.chiefofstaff.ui.screens.OnboardingScreen
 import kotlinx.coroutines.launch
 
 /**
- * The single Activity. Renders [CosApp] (all four screens live inside it), requests the runtime
- * permissions the capture + ritual surfaces need, starts the foreground watchdog (SYS-08), and
- * routes the Quick Settings / share / assistant capture intents into the pipeline.
+ * The single Activity. On first run it shows the [OnboardingScreen] — a consent gate that, once the
+ * user says Yes, requests the runtime permissions and walks them into each special-access Settings
+ * panel. After onboarding (or a skip) it renders [CosApp] (all four screens), starts the foreground
+ * watchdog (SYS-08), and routes the Quick Settings / share / assistant capture intents.
  */
 class MainActivity : ComponentActivity() {
 
@@ -25,21 +30,34 @@ class MainActivity : ComponentActivity() {
         const val ACTION_QUICK_CAPTURE = "com.chiefofstaff.QUICK_CAPTURE"
     }
 
-    private val requestPermissions = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { /* Permissions are best-effort; the app degrades gracefully without them (P11). */ }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // The app commits to a light scheme, so force dark system-bar icons (time, battery, gesture
+        // pill) for legibility even when the phone itself is in dark mode. Transparent scrims keep
+        // the bars edge-to-edge; the screens pad for the insets themselves.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+        )
 
         val app = application as ChiefOfStaffApp
         val startInCapture = intent?.action == ACTION_QUICK_CAPTURE
         handleShare(intent)
 
-        setContent { CosApp(app.container, startInCapture = startInCapture) }
+        setContent {
+            // Onboarding owns the first permission request, so nothing is prompted until the user
+            // opts in. Once complete (or skipped) we never gate again.
+            var onboarded by remember { mutableStateOf(Permissions.isOnboarded(this)) }
+            if (onboarded) {
+                CosApp(app.container, startInCapture = startInCapture)
+            } else {
+                OnboardingScreen(onEnter = {
+                    Permissions.markOnboarded(this)
+                    onboarded = true
+                })
+            }
+        }
 
-        requestRuntimePermissions()
         runCatching { RitualForegroundService.start(this) }
     }
 
@@ -55,16 +73,5 @@ class MainActivity : ComponentActivity() {
             val app = application as ChiefOfStaffApp
             lifecycleScope.launch { app.container.captureManager.captureShared(text) }
         }
-    }
-
-    private fun requestRuntimePermissions() {
-        val wanted = buildList {
-            add(Manifest.permission.RECORD_AUDIO)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
-            add(Manifest.permission.READ_CALENDAR)
-        }.filter {
-            ContextCompat.checkSelfPermission(this, it) != android.content.pm.PackageManager.PERMISSION_GRANTED
-        }
-        if (wanted.isNotEmpty()) requestPermissions.launch(wanted.toTypedArray())
     }
 }

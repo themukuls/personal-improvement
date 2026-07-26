@@ -41,7 +41,9 @@ class PlanGenerator(
         val highLoad = (day.loadScore ?: 0f) >= 0.8f
         // DIR-09 — sick/recovery modes reduce the day to a single item, like a low-energy day.
         val recoveryMode = mode == com.chiefofstaff.data.model.Mode.SICK || mode == com.chiefofstaff.data.model.Mode.RECOVERY
-        val minimumViable = lowEnergy || highLoad || day.illnessFlag || recoveryMode
+        // Emotional intelligence: a low mood also collapses the day to one thing (EmotionalEngine).
+        val lowMood = day.mood in EmotionalEngine.LOW_MOODS
+        val minimumViable = lowEnergy || highLoad || day.illnessFlag || recoveryMode || lowMood
         val cap = if (minimumViable) 1 else maxItems
 
         val open = repo.commitments.openCommitments().first()

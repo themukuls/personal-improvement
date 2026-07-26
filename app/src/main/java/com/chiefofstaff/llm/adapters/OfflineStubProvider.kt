@@ -25,6 +25,7 @@ class OfflineStubProvider : LlmProvider {
         contextCeilingTokens = 8_000,
         models = mapOf(ModelTier.CHEAP to "stub", ModelTier.FLAGSHIP to "stub"),
         costPerKTokenPaise = mapOf(ModelTier.CHEAP to 0, ModelTier.FLAGSHIP to 0),
+        lastResort = true,   // only ever used after every real provider is unavailable/failing
     )
 
     override suspend fun available(): Boolean = true

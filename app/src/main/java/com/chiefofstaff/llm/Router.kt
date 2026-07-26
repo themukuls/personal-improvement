@@ -8,7 +8,7 @@ import kotlinx.coroutines.delay
  * with a secondary on failure (§6.6). Ordered [providers]: primary first, offline stub last.
  * Rate-limit failures back off; retryable transport failures fall through to the next provider.
  */
-class Router(private val providers: List<LlmProvider>) {
+class Router(private val providers: () -> List<LlmProvider>) {
 
     data class Selection(val provider: LlmProvider, val response: LlmResponse)
 
@@ -17,13 +17,16 @@ class Router(private val providers: List<LlmProvider>) {
      * cheapest-for-tier. Falls to the next available provider on a retryable failure.
      */
     suspend fun route(request: LlmRequest): Selection {
-        val ordered = providers
+        val ordered = providers()
             .sortedWith(
-                compareByDescending<LlmProvider> {
-                    request.cacheablePrefix != null && it.capabilities.supportsPromptCaching
-                }.thenBy {
-                    it.capabilities.costPerKTokenPaise[request.tier] ?: Int.MAX_VALUE
-                }
+                // Real providers first; the offline stub is a genuine last resort (not "cheapest").
+                compareBy<LlmProvider> { it.capabilities.lastResort }
+                    .thenByDescending {
+                        request.cacheablePrefix != null && it.capabilities.supportsPromptCaching
+                    }
+                    .thenBy {
+                        it.capabilities.costPerKTokenPaise[request.tier] ?: Int.MAX_VALUE
+                    }
             )
 
         var lastError: ProviderException? = null

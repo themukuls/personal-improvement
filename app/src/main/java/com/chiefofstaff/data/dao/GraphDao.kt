@@ -93,6 +93,7 @@ interface GraphDao {
     suspend fun eventsBetween(from: Long, to: Long): List<EventEntity>
     @Query("SELECT * FROM event WHERE externalId = :externalId LIMIT 1")
     suspend fun eventByExternalId(externalId: String): EventEntity?
+    @Query("DELETE FROM event WHERE id = :id") suspend fun deleteEvent(id: Long)
 
     // Notes.
     @Insert suspend fun insertNote(n: Note): Long

@@ -23,6 +23,11 @@ data class ProviderCapabilities(
     val models: Map<ModelTier, String>,
     /** Rough output-token cost in paise (₹/100) for the cost-ceiling comparison. */
     val costPerKTokenPaise: Map<ModelTier, Int>,
+    /**
+     * True only for the offline stub: it must be tried *after* every real provider, never chosen for
+     * being "free". The router sorts last-resort providers to the very end regardless of cost.
+     */
+    val lastResort: Boolean = false,
 )
 
 data class LlmMessage(val role: String, val content: String)

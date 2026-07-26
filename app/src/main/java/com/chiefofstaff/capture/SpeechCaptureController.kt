@@ -34,6 +34,10 @@ class SpeechCaptureController(private val context: Context) {
     private val _continuous = MutableStateFlow(false)
     val continuous: StateFlow<Boolean> = _continuous
 
+    /** Live mic loudness 0..1, driven by the recogniser's RMS — feeds the reactive listening orb. */
+    private val _amplitude = MutableStateFlow(0f)
+    val amplitude: StateFlow<Float> = _amplitude
+
     private var recognizer: SpeechRecognizer? = null
 
     fun available(): Boolean = SpeechRecognizer.isRecognitionAvailable(context)
@@ -61,7 +65,10 @@ class SpeechCaptureController(private val context: Context) {
         r.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) { _state.value = State.Listening }
             override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onRmsChanged(rmsdB: Float) {
+                // RMS is roughly -2 dB (silence) to ~10 dB (loud); normalise to 0..1 for the orb.
+                _amplitude.value = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
+            }
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
             override fun onPartialResults(partial: Bundle?) {
@@ -101,12 +108,13 @@ class SpeechCaptureController(private val context: Context) {
 
     fun stop() {
         _continuous.value = false
+        _amplitude.value = 0f
         recognizer?.run { stopListening(); destroy() }
         recognizer = null
         if (_state.value is State.Listening) _state.value = State.Idle
     }
 
-    fun reset() { _state.value = State.Idle }
+    fun reset() { _state.value = State.Idle; _amplitude.value = 0f }
 
     private fun Bundle?.firstResult(): String? =
         this?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()

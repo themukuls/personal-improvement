@@ -2,6 +2,7 @@ package com.chiefofstaff.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -35,8 +37,8 @@ import com.chiefofstaff.ui.theme.Palette
 import com.chiefofstaff.ui.theme.neuSurface
 
 /**
- * The hollow circular check on each TODAY row. Tapping it is one gesture to a "done" verdict
- * (P6). Neumorphic: sunken ring when empty, gradient-filled with a check when done.
+ * The circular check on each TODAY tile. Tapping it is one gesture to a "done" verdict (P6).
+ * Flat: a thin outlined ring when empty, a solid accent circle with a white check when done.
  */
 @Composable
 fun NeuCheckbox(
@@ -49,8 +51,8 @@ fun NeuCheckbox(
             .size(26.dp)
             .clip(CircleShape)
             .then(
-                if (checked) Modifier.background(AvatarGradient)
-                else Modifier.neuSurface(cornerRadius = 13, elevation = 6.dp, pressed = true)
+                if (checked) Modifier.background(Palette.Accent)
+                else Modifier.border(1.5.dp, Palette.InkGhost, CircleShape)
             )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -71,14 +73,29 @@ fun NeuCheckbox(
     }
 }
 
-/** Raised pill button — "Add commitment". */
+/** Primary pill button — solid violet accent, white label. The one emphasised action on a surface. */
 @Composable
 fun NeuButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .neuSurface(cornerRadius = 16, elevation = 7.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Palette.Accent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 10.dp),
+            .padding(horizontal = 18.dp, vertical = 11.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = androidx.compose.material3.MaterialTheme.typography.labelLarge, color = Color.White)
+    }
+}
+
+/** Neutral pill button — flat white card with a soft shadow, ink label. Secondary to [NeuButton]. */
+@Composable
+fun NeuButtonNeutral(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .neuSurface(cornerRadius = 16, elevation = 6.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 11.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(text, style = androidx.compose.material3.MaterialTheme.typography.labelLarge, color = Palette.Ink)
@@ -100,19 +117,20 @@ fun GhostButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier
 }
 
 /**
- * The primary control (UX-02, P6). Hold to talk; the ramble is captured (CAP-01) and parsed.
- * Rendered as a gradient pill that presses in while held. Sits at the right of the bottom nav.
+ * The primary control (UX-02, P6). Tap to talk: one tap starts listening, the recogniser finishes on
+ * its own when you stop speaking, and the transcript is captured (CAP-01) and sent to the assistant.
+ * Tap again while listening to cancel. Double-tap starts a hands-free session (CNV-13). It pulses
+ * while active so it's obvious it's live. Sits at the right of the bottom nav.
  */
 @Composable
-fun HoldToTalkButton(
-    onHoldStart: () -> Unit,
-    onHoldEnd: () -> Unit,
+fun MicButton(
+    listening: Boolean,
+    onTap: () -> Unit,
     modifier: Modifier = Modifier,
     onDoubleTap: () -> Unit = {},
     sizeDp: Int = 44,
 ) {
-    var held by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    val scale by animateFloatAsState(if (held) 0.92f else 1f, label = "hold-scale")
+    val scale by animateFloatAsState(if (listening) 1.12f else 1f, label = "mic-scale")
     Box(
         modifier = modifier
             .size(sizeDp.dp)
@@ -121,23 +139,15 @@ fun HoldToTalkButton(
             .background(AvatarGradient)
             .pointerInput(Unit) {
                 detectTapGestures(
-                    // Double-tap toggles a hands-free session (CNV-13); a plain hold is one capture.
-                    // Double-tap leaves no held pointer, so it won't be undone by a release handler.
                     onDoubleTap = { onDoubleTap() },
-                    onPress = {
-                        held = true
-                        onHoldStart()
-                        tryAwaitRelease()
-                        held = false
-                        onHoldEnd()
-                    },
+                    onTap = { onTap() },
                 )
             },
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = Icons.Filled.Mic,
-            contentDescription = "Hold to talk",
+            imageVector = if (listening) Icons.Filled.Stop else Icons.Filled.Mic,
+            contentDescription = if (listening) "Stop listening" else "Tap to talk",
             tint = Color.White,
             modifier = Modifier.size((sizeDp * 0.42f).dp),
         )

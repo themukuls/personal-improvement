@@ -34,10 +34,6 @@ class TalkViewModel(private val container: AppContainer) : ViewModel() {
     val state: StateFlow<TalkUiState> = _state
     private var sessionId: Long = -1
 
-    fun setMode(mode: ConversationMode) {
-        _state.value = _state.value.copy(mode = mode)
-    }
-
     private suspend fun ensureSession(): Long {
         if (sessionId > 0) return sessionId
         sessionId = container.repo.conversation.insertSession(
@@ -49,9 +45,12 @@ class TalkViewModel(private val container: AppContainer) : ViewModel() {
     fun send(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
-        val mode = _state.value.mode
+        // The user just talks — the conversation model reads intent and adapts in ONE call. A cheap
+        // keyword pass only decides whether to offer "Save as decision" on the reply.
+        val mode = inferMode(trimmed)
         _state.value = _state.value.copy(
             lines = _state.value.lines + ChatLine("user", trimmed),
+            mode = mode,
             thinking = true,
         )
         viewModelScope.launch {
@@ -60,11 +59,10 @@ class TalkViewModel(private val container: AppContainer) : ViewModel() {
             container.repo.conversation.insertMessage(Message(sessionId = sid, role = "user", content = trimmed, createdAt = now))
 
             val history = _state.value.lines.joinToString("\n") { "${it.role}: ${it.text}" }
-            val framed = "Mode: ${mode.name}. ${directive(mode)}\nUser: $trimmed"
             val result = container.orchestrator.run(
                 TaskId.CONVERSE,
                 params = mapOf("history" to history, "message" to trimmed),
-                extraUserContent = framed,
+                extraUserContent = "User: $trimmed",
             )
             val reply = when (result) {
                 is LlmOrchestrator.TaskResult.Text -> result.text
@@ -81,6 +79,36 @@ class TalkViewModel(private val container: AppContainer) : ViewModel() {
             )
         }
     }
+
+    /**
+     * A spoken command from the mic: interpret it, take the action (create task / event / reminder,
+     * give a brief, save a note, or answer), and show the exchange here. This is the "voice can do
+     * anything" path — distinct from typed [send], which is pure conversation.
+     */
+    fun voiceCommand(text: String) {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return
+        _state.value = _state.value.copy(
+            lines = _state.value.lines + ChatLine("user", trimmed),
+            thinking = true,
+        )
+        viewModelScope.launch {
+            val reply = runCatching { container.voiceCommandProcessor.handle(trimmed).reply }
+                .getOrElse { "Something went wrong handling that — but I saved what you said." }
+            _state.value = _state.value.copy(
+                lines = _state.value.lines + ChatLine("assistant", reply),
+                thinking = false,
+            )
+            // Speak the confirmation back — a voice command deserves a voice answer (INT-01).
+            runCatching {
+                if (container.tts.awaitReady()) container.tts.speak(forSpeech(reply))
+            }
+        }
+    }
+
+    /** Flatten bullets/newlines so the TTS engine reads a brief naturally rather than "bullet, …". */
+    private fun forSpeech(text: String): String =
+        text.replace("•", " ").replace(Regex("\\s*\\n+\\s*"), ". ").replace(Regex("\\s{2,}"), " ").trim()
 
     /** CNV-04 — one-tap fact emission: run a line through the capture pipeline to derive typed facts. */
     fun saveToMemory(line: ChatLine) {
@@ -116,15 +144,26 @@ class TalkViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
-    private fun directive(mode: ConversationMode): String = when (mode) {
-        ConversationMode.RECALL -> "Answer from my own history and cite the capture."
-        ConversationMode.PLAN -> "Work through scheduling and sequencing against my real constraints."
-        ConversationMode.THINK -> "Think openly with me, with full context loaded."
-        ConversationMode.CHALLENGE ->
-            "Argue the other side. If this contradicts a stated rule or a past decision, say so and cite it."
-        ConversationMode.DECIDE ->
-            "Give options, criteria and past analogues, then a recommendation. This may become a Decision record."
-        ConversationMode.DRAFT -> "Draft the message, email or agenda in my voice."
-        ConversationMode.DEBRIEF -> "Extract what happened: what was committed, by whom."
+    /**
+     * A cheap keyword pass whose only job now is to decide whether the assistant's reply should offer
+     * "Save as decision" — the conversation model itself adapts its stance in the main call (§10.1),
+     * so this never gates the answer, only that one affordance. Defaults to THINK.
+     */
+    private fun inferMode(text: String): ConversationMode {
+        val t = " ${text.lowercase()} "
+        fun any(vararg cues: String) = cues.any { it in t }
+        return when {
+            any("challenge me", "push back", "devil's advocate", "poke holes", "am i wrong",
+                "talk me out", "convince me", "argue") -> ConversationMode.CHALLENGE
+            any("should i", "help me decide", "which one", "which is", "better to", "worth it",
+                "pros and cons", "or should i", "decide") -> ConversationMode.DECIDE
+            any("when did", "what did i", "did i ", "have i ", "last time", "remember when",
+                "what was", "who did i", "recall", "look up") -> ConversationMode.RECALL
+            any("plan my", "plan the", "plan out", "schedule", "organis", "organiz", "sequence",
+                "fit in", "when should i", "map out") -> ConversationMode.PLAN
+            any("draft", "write a ", "compose", "email to", "message to", "reply to", "write an") ->
+                ConversationMode.DRAFT
+            else -> ConversationMode.THINK
+        }
     }
 }

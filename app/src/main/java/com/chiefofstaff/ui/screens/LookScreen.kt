@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.chiefofstaff.data.model.Domain
 import com.chiefofstaff.data.model.Mode
 import com.chiefofstaff.domain.ReductionEngine
+import com.chiefofstaff.ui.components.CosTextField
 import com.chiefofstaff.ui.components.NeuCard
 import com.chiefofstaff.ui.components.SectionLabel
 import com.chiefofstaff.ui.theme.Mono
@@ -60,18 +61,12 @@ fun LookScreen(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp),
     ) {
         Spacer(Modifier.height(20.dp))
-        TextField(
+        CosTextField(
             value = state.query,
             onValueChange = onQuery,
-            placeholder = { Text("Search everything", color = Palette.InkGhost) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().neuSurface(cornerRadius = 22, elevation = 6.dp, pressed = true),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-            ),
+            placeholder = "Search everything",
+            modifier = Modifier.fillMaxWidth(),
+            imeAction = androidx.compose.ui.text.input.ImeAction.Search,
         )
 
         if (state.results.isNotEmpty()) {
@@ -106,32 +101,7 @@ fun LookScreen(
             }
         }
 
-        // DIR-09 — operating mode; shapes the plan and notification posture.
-        Spacer(Modifier.height(12.dp))
-        NeuCard(modifier = Modifier.fillMaxWidth()) {
-            Column {
-                SectionLabel("MODE")
-                Spacer(Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Mode.entries.forEach { mode ->
-                        val active = mode == state.currentMode
-                        Text(
-                            text = mode.name.lowercase().replace('_', ' '),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (active) Palette.Ink else Palette.InkFaint,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(14.dp))
-                                .then(if (active) Modifier.neuSurface(cornerRadius = 14, elevation = 5.dp, pressed = true) else Modifier)
-                                .clickable { onSetMode(mode) }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                        )
-                    }
-                }
-            }
-        }
+        // Mode now lives in the Now header (deduped); Look keeps only the longer-form quiet control.
 
         Spacer(Modifier.height(20.dp))
         CollapsedSection("DIRECTION", LookSection.DIRECTION, state, onToggleSection) {
