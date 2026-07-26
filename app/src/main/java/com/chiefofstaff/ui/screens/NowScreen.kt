@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.InsertChartOutlined
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +40,7 @@ import com.chiefofstaff.data.entity.AnticipationItem
 import com.chiefofstaff.ui.components.GhostButton
 import com.chiefofstaff.ui.components.GradientCard
 import com.chiefofstaff.ui.components.NeuButton
+import com.chiefofstaff.ui.components.NeuButtonNeutral
 import com.chiefofstaff.ui.components.NeuCard
 import com.chiefofstaff.ui.components.SectionLabel
 import com.chiefofstaff.ui.theme.Mono
@@ -67,6 +69,7 @@ fun NowScreen(
     onToggleQuiet: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenCalendar: () -> Unit,
+    onOpenProgress: () -> Unit,
     onRelationshipAnswer: (String, Int) -> Unit,
     onRelationshipSayMore: () -> Unit,
     modifier: Modifier = Modifier,
@@ -84,10 +87,12 @@ fun NowScreen(
             name = state.name,
             mode = state.mode,
             quiet = state.quiet,
+            celebrating = state.allDoneToday,
             onSetMode = onSetMode,
             onToggleQuiet = onToggleQuiet,
             onOpenProfile = onOpenProfile,
             onOpenCalendar = onOpenCalendar,
+            onOpenProgress = onOpenProgress,
         )
         Spacer(Modifier.height(10.dp))
         Text(state.statusLine, style = Mono.Status, color = Palette.InkFaint)
@@ -97,16 +102,20 @@ fun NowScreen(
         if (showReentry) {
             Spacer(Modifier.height(16.dp))
             NeuCard(modifier = Modifier.fillMaxWidth()) {
-                Column {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     SectionLabel("WELCOME BACK")
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(8.dp))
                     Text(
                         "It's been ${state.reentryDays} days. I kept things quiet — here's just today, nothing to catch up on.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = Palette.InkMuted,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     )
-                    Spacer(Modifier.height(10.dp))
-                    GhostButton(text = "Thanks", onClick = { reentryDismissed = true })
+                    Spacer(Modifier.height(12.dp))
+                    NeuButtonNeutral(text = "Thanks", onClick = { reentryDismissed = true })
                 }
             }
         }
@@ -250,17 +259,28 @@ private fun RelationshipCard(
 @Composable
 private fun WelcomeTile(name: String, onStart: () -> Unit) {
     NeuCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onStart)) {
-        Column {
+        Column(
+            modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                Icons.Outlined.WbSunny,
+                contentDescription = null,
+                tint = Palette.Accent,
+                modifier = Modifier.size(28.dp).padding(bottom = 12.dp),
+            )
             Text(
                 text = if (name.isBlank()) "Ready when you are" else "Ready when you are, $name",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 color = Palette.Ink,
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
                 text = "Nothing here yet — and that's fine. Hold the mic below and just tell me your first thing, or tap here to type it.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Palette.InkMuted,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
     }
@@ -346,20 +366,23 @@ private fun GreetingHeader(
     name: String,
     mode: com.chiefofstaff.data.model.Mode,
     quiet: Boolean,
+    celebrating: Boolean,
     onSetMode: (com.chiefofstaff.data.model.Mode) -> Unit,
     onToggleQuiet: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenCalendar: () -> Unit,
+    onOpenProgress: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Tappable avatar → the user's profile & options.
-        ProfileAvatar(
-            name = name,
-            size = 42,
-            modifier = Modifier.clip(CircleShape).clickable(onClick = onOpenProfile),
+        // Tappable mascot → the user's profile & options. Celebrates when the day's done.
+        com.chiefofstaff.ui.components.ChiefMascot(
+            state = if (celebrating) com.chiefofstaff.ui.components.MascotState.CELEBRATING
+            else com.chiefofstaff.ui.components.MascotState.CALM,
+            size = 46.dp,
+            modifier = Modifier.clickable(onClick = onOpenProfile)
         )
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -387,22 +410,38 @@ private fun GreetingHeader(
         // Compact mode + quiet control, tucked into the header (freeing the body).
         ModeChipMenu(mode = mode, quiet = quiet, onSetMode = onSetMode, onToggleQuiet = onToggleQuiet)
         Spacer(Modifier.width(8.dp))
+        // Progress → consistency, this week, saved reviews.
+        HeaderIconButton(
+            icon = Icons.Outlined.InsertChartOutlined,
+            label = "Progress",
+            onClick = onOpenProgress,
+        )
+        Spacer(Modifier.width(8.dp))
         // Calendar → month heatmap + day detail.
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .neuSurface(cornerRadius = 20, elevation = 6.dp)
-                .clip(CircleShape)
-                .clickable(onClick = onOpenCalendar),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Outlined.CalendarMonth,
-                contentDescription = "Calendar",
-                tint = Palette.InkMuted,
-                modifier = Modifier.size(20.dp),
-            )
-        }
+        HeaderIconButton(
+            icon = Icons.Outlined.CalendarMonth,
+            label = "Calendar",
+            onClick = onOpenCalendar,
+        )
+    }
+}
+
+/** A round, sunken header action button — used for the calendar and progress entries. */
+@Composable
+private fun HeaderIconButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .neuSurface(cornerRadius = 20, elevation = 6.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = label, tint = Palette.InkMuted, modifier = Modifier.size(20.dp))
     }
 }
 

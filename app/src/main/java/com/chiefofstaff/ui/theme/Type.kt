@@ -35,30 +35,33 @@ val CoSTypography = Typography(
     // Screen title — "Tuesday, 28 July"
     headlineMedium = TextStyle(
         fontFamily = ContentFamily,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Medium,
         fontSize = 24.sp,
         lineHeight = 30.sp,
-        letterSpacing = (-0.3).sp,
+        letterSpacing = (-0.5).sp,
     ),
     // Card headline — anticipation copy, identity line
     titleLarge = TextStyle(
         fontFamily = ContentFamily,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Medium,
         fontSize = 18.sp,
         lineHeight = 24.sp,
+        letterSpacing = (-0.2).sp,
     ),
     // List item title — "Q3 capacity plan to Rakesh"
     titleMedium = TextStyle(
         fontFamily = ContentFamily,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Medium,
         fontSize = 16.sp,
         lineHeight = 22.sp,
+        letterSpacing = (-0.1).sp,
     ),
     bodyLarge = TextStyle(
         fontFamily = ContentFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 15.sp,
         lineHeight = 22.sp,
+        letterSpacing = 0.sp,
     ),
     // Context subline — "deferred once · predicted 15:20"
     bodyMedium = TextStyle(
@@ -66,6 +69,7 @@ val CoSTypography = Typography(
         fontWeight = FontWeight.Normal,
         fontSize = 13.sp,
         lineHeight = 18.sp,
+        letterSpacing = 0.1.sp,
     ),
     // Button / nav label
     labelLarge = TextStyle(
@@ -73,6 +77,7 @@ val CoSTypography = Typography(
         fontWeight = FontWeight.SemiBold,
         fontSize = 14.sp,
         lineHeight = 18.sp,
+        letterSpacing = 0.2.sp,
     ),
     // Mono section labels + times live here (see [Mono] below for the styled variant).
     labelSmall = TextStyle(

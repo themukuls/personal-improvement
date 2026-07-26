@@ -29,6 +29,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
 import com.chiefofstaff.ui.theme.AvatarGradient
@@ -46,8 +47,13 @@ fun NeuCheckbox(
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (isPressed) 0.9f else 1f, label = "checkbox-scale")
+
     Box(
         modifier = modifier
+            .scale(scale)
             .size(26.dp)
             .clip(CircleShape)
             .then(
@@ -55,7 +61,7 @@ fun NeuCheckbox(
                 else Modifier.border(1.5.dp, Palette.InkGhost, CircleShape)
             )
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interactionSource,
                 indication = null,
                 role = Role.Checkbox,
                 onClick = onToggle,
@@ -76,11 +82,20 @@ fun NeuCheckbox(
 /** Primary pill button — solid violet accent, white label. The one emphasised action on a surface. */
 @Composable
 fun NeuButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (isPressed) 0.95f else 1f, label = "button-scale")
+
     Box(
         modifier = modifier
+            .scale(scale)
             .clip(RoundedCornerShape(16.dp))
             .background(Palette.Accent)
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
             .padding(horizontal = 18.dp, vertical = 11.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -91,10 +106,19 @@ fun NeuButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) 
 /** Neutral pill button — flat white card with a soft shadow, ink label. Secondary to [NeuButton]. */
 @Composable
 fun NeuButtonNeutral(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (isPressed) 0.95f else 1f, label = "button-neutral-scale")
+
     Box(
         modifier = modifier
+            .scale(scale)
             .neuSurface(cornerRadius = 16, elevation = 6.dp)
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
             .padding(horizontal = 18.dp, vertical = 11.dp),
         contentAlignment = Alignment.Center,
     ) {

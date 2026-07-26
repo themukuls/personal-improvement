@@ -24,8 +24,11 @@ class RitualAlarmReceiver : BroadcastReceiver() {
     companion object {
         const val ACTION_RITUAL = "com.chiefofstaff.RITUAL"
         const val ACTION_COMMITMENT_DUE = "com.chiefofstaff.COMMITMENT_DUE"
+        const val ACTION_MEMORY_REMINDER = "com.chiefofstaff.MEMORY_REMINDER"
         const val EXTRA_RITUAL = "ritual"
         const val EXTRA_COMMITMENT_ID = "commitment_id"
+        const val EXTRA_MEMORY_ID = "memory_id"
+        const val EXTRA_MEMORY_TEXT = "memory_text"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -60,6 +63,33 @@ class RitualAlarmReceiver : BroadcastReceiver() {
                     )
                 }
             }
+            ACTION_MEMORY_REMINDER -> {
+                val text = intent.getStringExtra(EXTRA_MEMORY_TEXT).orEmpty()
+                if (text.isNotBlank()) postMemoryReminder(context, intent.getLongExtra(EXTRA_MEMORY_ID, 0L), text)
+            }
         }
+    }
+
+    /** Post a reminder notification directly (quick; the receiver has only a few seconds). */
+    private fun postMemoryReminder(context: Context, memoryId: Long, text: String) {
+        Channels.ensure(context)
+        val tap = android.app.PendingIntent.getActivity(
+            context, 0,
+            Intent(context, com.chiefofstaff.MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            android.app.PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = androidx.core.app.NotificationCompat.Builder(context, Channels.RITUAL)
+            .setSmallIcon(com.chiefofstaff.R.drawable.ic_mic)
+            .setContentTitle("Reminder")
+            .setContentText(text)
+            .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setContentIntent(tap)
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+            .build()
+        runCatching {
+            androidx.core.app.NotificationManagerCompat.from(context)
+                .notify((700_000 + (memoryId % 100_000)).toInt(), notification)
+        }.onFailure { AppLog.w("memory", "reminder notify failed", it) }
     }
 }

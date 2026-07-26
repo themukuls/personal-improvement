@@ -34,6 +34,7 @@ import com.chiefofstaff.intervention.MorningBrief
 import com.chiefofstaff.intervention.NotificationBudget
 import com.chiefofstaff.intervention.Notifier
 import com.chiefofstaff.intervention.PeriodReview
+import com.chiefofstaff.intervention.MemoryReminderScheduler
 import com.chiefofstaff.intervention.RitualScheduler
 import com.chiefofstaff.intervention.TtsSpeaker
 import com.chiefofstaff.intervention.WeeklyAudit
@@ -146,6 +147,7 @@ class AppContainer(context: Context) {
     val planGenerator: PlanGenerator by lazy { PlanGenerator(repo, clock, orchestrator, fallback, ruleEngine, ledger) }
     val anticipationEngine: AnticipationEngine by lazy { AnticipationEngine(repo, clock) }
     val consistencyScore: ConsistencyScore by lazy { ConsistencyScore(repo, clock) }
+    val progressEngine: com.chiefofstaff.domain.ProgressEngine by lazy { com.chiefofstaff.domain.ProgressEngine(repo, clock, consistencyScore) }
     val emotionalEngine: EmotionalEngine by lazy { EmotionalEngine(repo, clock, consistencyScore) }
     val relationshipEngine: RelationshipEngine by lazy { RelationshipEngine(repo, clock, consistencyScore) }
     val reductionEngine: ReductionEngine by lazy { ReductionEngine(repo, clock, stateMachine) }
@@ -163,7 +165,7 @@ class AppContainer(context: Context) {
     val mealEstimator: MealEstimator by lazy { MealEstimator(repo, clock, orchestrator) }
     val meetingSummariser: MeetingSummariser by lazy { MeetingSummariser(repo, clock, orchestrator) }
     val voiceCommandProcessor: VoiceCommandProcessor by lazy {
-        VoiceCommandProcessor(appContext, repo, clock, orchestrator, ritualScheduler, planGenerator, emotionalEngine)
+        VoiceCommandProcessor(appContext, repo, clock, orchestrator, ritualScheduler, memoryReminderScheduler, planGenerator, emotionalEngine)
     }
 
     // --- Intervention ---
@@ -176,6 +178,7 @@ class AppContainer(context: Context) {
     val middayPulse: MiddayPulse by lazy { MiddayPulse(repo, clock, notifier) }
     val periodReview: PeriodReview by lazy { PeriodReview(repo, clock, consistencyScore, horizonEngine, projectionEngine, reductionEngine, notifier) }
     val ritualScheduler: RitualScheduler by lazy { RitualScheduler(appContext, clock) }
+    val memoryReminderScheduler: MemoryReminderScheduler by lazy { MemoryReminderScheduler(appContext, clock.zone()) }
 
     // --- System ---
     val backup: Backup by lazy { Backup(appContext, repo, clock) }

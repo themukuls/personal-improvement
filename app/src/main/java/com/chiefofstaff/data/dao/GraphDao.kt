@@ -98,6 +98,15 @@ interface GraphDao {
     // Notes.
     @Insert suspend fun insertNote(n: Note): Long
     @Query("SELECT * FROM note ORDER BY createdAt DESC") fun notes(): Flow<List<Note>>
+    @Query("SELECT * FROM note ORDER BY createdAt DESC LIMIT :limit") suspend fun recentNotes(limit: Int): List<Note>
+
+    // Memories (dated, with proactive reminders).
+    @Insert suspend fun insertMemory(m: com.chiefofstaff.data.entity.Memory): Long
+    @Query("SELECT * FROM memory ORDER BY CASE WHEN remindAt IS NULL THEN 1 ELSE 0 END, remindAt ASC, createdAt DESC")
+    fun memories(): Flow<List<com.chiefofstaff.data.entity.Memory>>
+    @Query("DELETE FROM memory WHERE id = :id") suspend fun deleteMemory(id: Long)
+    @Query("SELECT * FROM memory WHERE remindAt IS NOT NULL AND remindAt >= :now")
+    suspend fun upcomingMemories(now: Long): List<com.chiefofstaff.data.entity.Memory>
 
     // Occasions (DOM-16 — recurring dates per person).
     @Insert suspend fun insertOccasion(o: Occasion): Long

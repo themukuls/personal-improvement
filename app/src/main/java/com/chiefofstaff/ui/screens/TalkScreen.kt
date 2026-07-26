@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -73,7 +74,16 @@ fun TalkScreen(
                     ChatBubble(line, onSave, onSaveDecision, decideMode = state.mode == ConversationMode.DECIDE)
                 }
                 if (state.thinking) {
-                    item { Text("…", style = MaterialTheme.typography.titleLarge, color = Palette.InkFaint, modifier = Modifier.padding(8.dp)) }
+                    item {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(4.dp)) {
+                            com.chiefofstaff.ui.components.ChiefMascot(
+                                state = com.chiefofstaff.ui.components.MascotState.THINKING,
+                                size = 44.dp,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("thinking…", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+                        }
+                    }
                 }
             }
         }

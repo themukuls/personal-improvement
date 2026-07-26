@@ -131,6 +131,18 @@ class LifeRepository(
         state.upsertDay(d.copy(mood = mood, updatedAt = clock.now()))
     }
 
+    // --- Memories (dated things the app should remind you about) ---
+    fun memories(): Flow<List<com.chiefofstaff.data.entity.Memory>> = graph.memories()
+
+    suspend fun saveMemory(text: String, remindAt: java.time.Instant?, hasTime: Boolean): Long =
+        graph.insertMemory(
+            com.chiefofstaff.data.entity.Memory(
+                text = text.trim(), remindAt = remindAt, hasTime = hasTime, createdAt = clock.now(),
+            )
+        )
+
+    suspend fun deleteMemory(id: Long) = graph.deleteMemory(id)
+
     /** FTS MATCH is picky about punctuation; keep alnum tokens and OR them for forgiving recall. */
     private fun sanitizeFts(query: String): String =
         query.split(Regex("\\s+"))

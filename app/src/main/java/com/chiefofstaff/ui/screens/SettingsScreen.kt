@@ -1,7 +1,9 @@
 package com.chiefofstaff.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,8 +24,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.chiefofstaff.AppContainer
+import com.chiefofstaff.intervention.RitualScheduler
 import com.chiefofstaff.system.ProviderConfig
+import com.chiefofstaff.system.UserProfile
 import com.chiefofstaff.ui.components.CosTextField
+import com.chiefofstaff.ui.components.FocusChip
 import com.chiefofstaff.ui.components.NeuButton
 import com.chiefofstaff.ui.components.NeuButtonNeutral
 import com.chiefofstaff.ui.components.NeuCard
@@ -46,6 +51,8 @@ fun SettingsScreen(
     val config = remember { ProviderConfig(context) }
     val scope = rememberCoroutineScope()
 
+    val profile = remember { UserProfile(context) }
+    var brief by remember { mutableStateOf(profile.briefHour.ifBlank { "6" }) }
     var groq by remember { mutableStateOf(config.groqKey) }
     var claude by remember { mutableStateOf(config.claudeKey) }
     var openai by remember { mutableStateOf(config.openAiKey) }
@@ -56,7 +63,6 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Palette.Base)
             .safeDrawingPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 22.dp, vertical = 12.dp),
@@ -73,6 +79,33 @@ fun SettingsScreen(
                 color = Palette.InkMuted,
             )
         }
+
+        Spacer(Modifier.height(20.dp))
+        SectionLabel("MORNING BRIEF")
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "When Chief reads your day back to you each morning.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Palette.InkMuted,
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            listOf("6" to "6:00", "7" to "7:00", "8" to "8:00", "none" to "Off").forEach { (value, label) ->
+                FocusChip(
+                    label = label,
+                    selected = brief == value,
+                    onClick = {
+                        brief = value
+                        profile.briefHour = value
+                        // Re-arm (or cancel) the exact alarm immediately so the change takes effect today.
+                        runCatching {
+                            container.ritualScheduler.schedule(RitualScheduler.Ritual.MORNING_BRIEF)
+                        }
+                    },
+                )
+            }
+        }
+        Spacer(Modifier.height(24.dp))
 
         KeyField(
             label = "GROQ API KEY",

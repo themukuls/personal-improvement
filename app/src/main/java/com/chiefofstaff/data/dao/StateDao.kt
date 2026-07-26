@@ -18,6 +18,9 @@ interface StateDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertDay(d: DayState)
     @Query("SELECT * FROM day_state WHERE date = :date") suspend fun day(date: String): DayState?
     @Query("SELECT * FROM day_state WHERE date = :date") fun dayFlow(date: String): Flow<DayState?>
+    // ISO date strings sort chronologically, so a lexical range is a real time range (progress history).
+    @Query("SELECT * FROM day_state WHERE date >= :since ORDER BY date ASC")
+    suspend fun daysSince(since: String): List<DayState>
 
     // Mode (singleton).
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertMode(m: ModeState)

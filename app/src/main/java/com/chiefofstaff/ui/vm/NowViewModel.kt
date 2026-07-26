@@ -43,6 +43,7 @@ data class NowUiState(
     val mode: com.chiefofstaff.data.model.Mode = com.chiefofstaff.data.model.Mode.NORMAL,
     val quiet: Boolean = false,
     val modeSetToday: Boolean = false,
+    val allDoneToday: Boolean = false,
     val reentryDays: Int = 0,
     val loading: Boolean = true,
 )
@@ -93,8 +94,14 @@ class NowViewModel(private val container: AppContainer) : ViewModel() {
             next?.let { append(" · next ${hhmm(it.start, zone)} ${it.title.lowercase()}") }
         }
 
-        // Emotional intelligence: a warm, non-guilt read of the day (deterministic; always available).
-        val support = container.emotionalEngine.read()
+        // Celebrate when the list is clear *and* something was actually completed today.
+        val startOfToday = today.atStartOfDay(zone).toInstant().toEpochMilli()
+        val doneToday = repo.commitments.doneCountSince(startOfToday)
+        val allDoneToday = rows.isEmpty() && doneToday > 0
+
+        // Emotional intelligence: a warm, non-guilt read of the day, tuned by the user's chosen
+        // support style from onboarding (deterministic; always available).
+        val support = container.emotionalEngine.read(firm = profile.nudgeStyle == "firm")
 
         // The daily "tell & ask" prompt — one per day, suppressed once answered.
         val answeredToday = relPrefs.getString("answered_date", "") == clock.today().toString()
@@ -118,6 +125,7 @@ class NowViewModel(private val container: AppContainer) : ViewModel() {
             mode = mode?.current ?: com.chiefofstaff.data.model.Mode.NORMAL,
             quiet = mode?.quietUntil?.isAfter(clock.now()) == true,
             modeSetToday = mode?.since?.isAfter(today.atStartOfDay(zone).toInstant()) == true,
+            allDoneToday = allDoneToday,
             reentryDays = container.daysAway,
             loading = false,
         )

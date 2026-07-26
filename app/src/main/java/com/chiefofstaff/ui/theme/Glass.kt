@@ -38,13 +38,13 @@ fun Modifier.glassSurface(
 ): Modifier = this
     .drawBehind {
         val radiusPx = cornerRadius.dp.toPx()
-        val blur = elevation.toPx() * 0.9f
-        val dy = elevation.toPx() * 0.4f
+        val blur = elevation.toPx() * 1.5f
+        val dy = elevation.toPx() * 0.25f
         drawIntoCanvas { canvas ->
             val paint = Paint()
             val fw = paint.asFrameworkPaint()
             fw.color = android.graphics.Color.TRANSPARENT
-            fw.setShadowLayer(blur, 0f, dy, Palette.ShadowDark.copy(alpha = 0.5f).toArgb())
+            fw.setShadowLayer(blur, 0f, dy, Palette.ShadowDark.copy(alpha = 0.35f).toArgb())
             canvas.drawRoundRect(0f, 0f, size.width, size.height, radiusPx, radiusPx, paint)
         }
     }

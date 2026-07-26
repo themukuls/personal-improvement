@@ -42,14 +42,18 @@ import com.chiefofstaff.ui.screens.CloseScreen
 import com.chiefofstaff.ui.screens.LookScreen
 import com.chiefofstaff.ui.screens.NowScreen
 import com.chiefofstaff.ui.screens.ProfileScreen
+import com.chiefofstaff.ui.screens.ProgressScreen
+import com.chiefofstaff.ui.screens.DailyRecapDialog
 import com.chiefofstaff.ui.screens.SettingsScreen
 import com.chiefofstaff.ui.screens.TalkScreen
+import com.chiefofstaff.ui.screens.WeeklyRecapDialog
 import com.chiefofstaff.ui.theme.ChiefOfStaffTheme
 import com.chiefofstaff.ui.theme.GlassBackdrop
 import com.chiefofstaff.ui.theme.Palette
 import com.chiefofstaff.ui.vm.CloseViewModel
 import com.chiefofstaff.ui.vm.LookViewModel
 import com.chiefofstaff.ui.vm.NowViewModel
+import com.chiefofstaff.ui.vm.ProgressViewModel
 import com.chiefofstaff.ui.vm.TalkViewModel
 import kotlinx.coroutines.launch
 
@@ -68,6 +72,7 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
         val talkVm: TalkViewModel = viewModel(factory = viewModelFactory { initializer { TalkViewModel(container) } })
         val closeVm: CloseViewModel = viewModel(factory = viewModelFactory { initializer { CloseViewModel(container) } })
         val lookVm: LookViewModel = viewModel(factory = viewModelFactory { initializer { LookViewModel(container) } })
+        val progressVm: ProgressViewModel = viewModel(factory = viewModelFactory { initializer { ProgressViewModel(container) } })
 
         val scope = rememberCoroutineScope()
         val context = LocalContext.current
@@ -168,6 +173,7 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
                             onToggleQuiet = nowVm::toggleQuiet,
                             onOpenProfile = { overlay = CosOverlay.Profile },
                             onOpenCalendar = { overlay = CosOverlay.Calendar },
+                            onOpenProgress = { overlay = CosOverlay.Progress },
                             onRelationshipAnswer = nowVm::answerRelationship,
                             onRelationshipSayMore = {
                                 nowVm.markRelationshipAnswered()
@@ -190,6 +196,7 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
                     }
                     Destination.Look -> {
                         val s by lookVm.state.collectAsStateWithLifecycle()
+                        val memories by lookVm.memories.collectAsStateWithLifecycle()
                         LookScreen(
                             state = s,
                             onQuery = lookVm::onQuery,
@@ -203,6 +210,9 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
                             onSetMode = lookVm::setMode,
                             onRecordOutcome = lookVm::recordDecisionOutcome,
                             onReschedule = lookVm::rescheduleTomorrow,
+                            memories = memories,
+                            onAddMemory = lookVm::addMemory,
+                            onDeleteMemory = lookVm::deleteMemory,
                         )
                     }
                 }
@@ -221,29 +231,83 @@ fun CosApp(container: AppContainer, startInCapture: Boolean = false) {
             }
         }
 
-            // Full-screen overlays above the main scaffold — reached from the profile avatar.
-            when (overlay) {
-                CosOverlay.Profile -> ProfileScreen(
-                    container = container,
-                    onBack = { overlay = null },
-                    onOpenSettings = { overlay = CosOverlay.Settings },
+            // Full-screen overlays above the main scaffold — each on its own glass backdrop so it
+            // reads as premium and consistent with the main app (they draw over it opaquely).
+            if (overlay != null) {
+                Box(Modifier.fillMaxSize()) {
+                    GlassBackdrop(Modifier.matchParentSize())
+                    when (overlay) {
+                        CosOverlay.Profile -> ProfileScreen(
+                            container = container,
+                            onBack = { overlay = null },
+                            onOpenSettings = { overlay = CosOverlay.Settings },
+                        )
+                        CosOverlay.Settings -> SettingsScreen(
+                            container = container,
+                            onBack = { overlay = CosOverlay.Profile },
+                        )
+                        CosOverlay.Calendar -> CalendarScreen(
+                            container = container,
+                            onBack = { overlay = null },
+                        )
+                        CosOverlay.Progress -> {
+                            val ps by progressVm.state.collectAsStateWithLifecycle()
+                            ProgressScreen(
+                                state = ps,
+                                onExport = {
+                                    progressVm.buildExport { text -> shareText(context, text) }
+                                },
+                                onBack = { overlay = null },
+                            )
+                        }
+                        null -> Unit
+                    }
+                }
+            }
+
+            // The once-a-week recap: shown over everything the first time the app opens in a new week.
+            val recap by progressVm.pendingRecap.collectAsStateWithLifecycle()
+            val dayRecap by progressVm.pendingDay.collectAsStateWithLifecycle()
+            recap?.let { r ->
+                WeeklyRecapDialog(
+                    recap = r,
+                    onViewProgress = {
+                        progressVm.dismissRecap()
+                        overlay = CosOverlay.Progress
+                    },
+                    onDismiss = { progressVm.dismissRecap() },
                 )
-                CosOverlay.Settings -> SettingsScreen(
-                    container = container,
-                    onBack = { overlay = CosOverlay.Profile },
+            }
+            // The day-close recap: shown once on the first open of a new day (never alongside the weekly).
+            if (recap == null) dayRecap?.let { d ->
+                DailyRecapDialog(
+                    recap = d,
+                    onViewProgress = {
+                        progressVm.dismissDayRecap()
+                        overlay = CosOverlay.Progress
+                    },
+                    onDismiss = { progressVm.dismissDayRecap() },
                 )
-                CosOverlay.Calendar -> CalendarScreen(
-                    container = container,
-                    onBack = { overlay = null },
-                )
-                null -> Unit
             }
         }
     }
 }
 
-/** The full-screen overlays reachable from the Now header (avatar → profile, icon → calendar). */
-private enum class CosOverlay { Profile, Settings, Calendar }
+/** Hand the progress export to the system share sheet — the user picks where it goes. */
+private fun shareText(context: android.content.Context, text: String) {
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(android.content.Intent.EXTRA_SUBJECT, "Chief of Staff — progress")
+        putExtra(android.content.Intent.EXTRA_TEXT, text)
+    }
+    context.startActivity(
+        android.content.Intent.createChooser(send, "Export progress")
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+    )
+}
+
+/** The full-screen overlays reachable from the Now header (avatar → profile, icons → calendar/progress). */
+private enum class CosOverlay { Profile, Settings, Calendar, Progress }
 
 @Composable
 private fun ListeningOverlay(

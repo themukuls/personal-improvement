@@ -233,7 +233,7 @@ object Tasks {
             id = TaskId.VOICE_COMMAND,
             tier = ModelTier.FLAGSHIP,   // correctness matters more than cost; the cheap tier was unreliable
             recipe = emptyList(),
-            promptRef = "voice_command@2",
+            promptRef = "voice_command@3",
             schemaRef = "command",
             temperature = 0.0,
             maxOutputTokens = 220,

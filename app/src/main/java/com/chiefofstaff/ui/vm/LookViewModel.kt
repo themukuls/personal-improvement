@@ -11,6 +11,7 @@ import com.chiefofstaff.domain.ReductionEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Duration
 
@@ -74,6 +75,29 @@ data class WaitingRow(val id: Long, val what: String, val who: String, val conte
 class LookViewModel(private val container: AppContainer) : ViewModel() {
     private val _state = MutableStateFlow(LookUiState())
     val state: StateFlow<LookUiState> = _state
+
+    /** MEM — the dated memories the app holds and reminds you about. */
+    val memories: StateFlow<List<com.chiefofstaff.data.entity.Memory>> =
+        container.repo.memories().stateIn(
+            viewModelScope,
+            kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000),
+            emptyList(),
+        )
+
+    fun addMemory(text: String, remindAt: java.time.Instant?, hasTime: Boolean) {
+        if (text.isBlank()) return
+        viewModelScope.launch {
+            val id = container.repo.saveMemory(text, remindAt, hasTime)
+            if (remindAt != null) runCatching { container.memoryReminderScheduler.schedule(id, text, remindAt, hasTime) }
+        }
+    }
+
+    fun deleteMemory(id: Long) {
+        viewModelScope.launch {
+            container.repo.deleteMemory(id)
+            runCatching { container.memoryReminderScheduler.cancel(id) }
+        }
+    }
 
     init { refreshQuiet() }
 

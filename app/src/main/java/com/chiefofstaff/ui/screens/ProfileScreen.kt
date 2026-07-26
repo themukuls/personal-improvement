@@ -81,7 +81,6 @@ fun ProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Palette.Base)
             .safeDrawingPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 22.dp, vertical = 12.dp),

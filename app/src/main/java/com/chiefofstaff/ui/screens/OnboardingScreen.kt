@@ -11,8 +11,15 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import com.chiefofstaff.ui.theme.neuSurface
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -93,71 +100,57 @@ fun OnboardingScreen(onEnter: () -> Unit) {
 
 // --- The conversation --------------------------------------------------------------------------
 
-private class Opt(val value: String, val label: String, val emoji: String? = null)
+private class Opt(val value: String, val label: String)
 
 private sealed interface Q {
     val key: String
     val coach: String
+    /** Big bold question headline shown above the coach bubble (text steps); null = ask in the bubble. */
+    val headline: String?
 }
 
-/** A single- or multi-select question rendered as tappable option cards / chips. */
+/** A single- or multi-select question rendered as numbered option cards. */
 private class ChoiceQ(
     override val key: String,
     override val coach: String,
     val options: List<Opt>,
     val multi: Boolean = false,
-) : Q
+) : Q {
+    override val headline: String? = null
+}
 
-/** A short free-text question. */
+/** A short free-text question: a bold headline + an intro from the coach. */
 private class TextQ(
     override val key: String,
+    override val headline: String,
     override val coach: String,
     val placeholder: String,
     val optional: Boolean = true,
 ) : Q
 
 private val QUESTIONS: List<Q> = listOf(
-    TextQ("name", "Hi — I'm going to be your chief of staff. First things first: what should I call you?", "First name", optional = false),
-    ChoiceQ("pronouns", "Lovely to meet you, {name}. How should I refer to you?", listOf(
-        Opt("she", "She / her"), Opt("he", "He / him"), Opt("they", "They / them"), Opt("", "Rather not say"),
-    )),
-    ChoiceQ("focus", "What do you want to stay on top of? Pick as many as fit.", listOf(
-        Opt("HEALTH", "Health", "🫀"), Opt("WORK", "Work", "💼"), Opt("MONEY", "Money", "💰"),
-        Opt("PEOPLE", "People", "💬"), Opt("HOME", "Home", "🏠"), Opt("LEARNING", "Learning", "📚"),
-        Opt("TRAVEL", "Travel", "✈️"), Opt("PROJECTS", "Projects", "🛠️"),
+    TextQ(
+        key = "name",
+        headline = "What should I call you?",
+        coach = "I'm your chief of staff. I'll ask a few quick things, then get out of your way.",
+        placeholder = "First name",
+        optional = false,
+    ),
+    ChoiceQ("focus", "Which of these matter most to you, {name}? Pick as many as fit.", listOf(
+        Opt("HEALTH", "Health"), Opt("WORK", "Work"), Opt("MONEY", "Money"), Opt("PEOPLE", "People"),
+        Opt("HOME", "Home"), Opt("LEARNING", "Learning"), Opt("TRAVEL", "Travel"), Opt("PROJECTS", "Projects"),
     ), multi = true),
-    ChoiceQ("goal", "What would make the biggest difference for you right now?", listOf(
-        Opt("drop", "Stop dropping the ball", "🎯"),
-        Opt("consistent", "Be more consistent", "🔁"),
-        Opt("people", "Make time for people", "💛"),
-        Opt("overwhelm", "Get out of overwhelm", "🌊"),
-        Opt("clarity", "Think more clearly", "🧠"),
+    ChoiceQ("goal", "What's the biggest hurdle right now?", listOf(
+        Opt("drop", "Stop dropping the ball"),
+        Opt("consistent", "Be more consistent"),
+        Opt("overwhelm", "Get out of overwhelm"),
+        Opt("clarity", "Think more clearly"),
     )),
-    ChoiceQ("chronotype", "When are you at your sharpest?", listOf(
-        Opt("early", "Early mornings", "🌅"), Opt("midday", "Midday", "☀️"),
-        Opt("evening", "Evenings", "🌙"), Opt("varies", "It really varies", "🎲"),
+    ChoiceQ("nudge", "When things get tough, how should I support you?", listOf(
+        Opt("gentle", "A kind word"),
+        Opt("firm", "Hold me to it"),
+        Opt("minimal", "Help me focus"),
     )),
-    ChoiceQ("nudge", "When you commit to something, how should I show up?", listOf(
-        Opt("gentle", "Nudge me gently", "🌿"),
-        Opt("firm", "Hold me to it", "💪"),
-        Opt("minimal", "Mostly stay out of the way", "🤫"),
-    )),
-    ChoiceQ("motivation", "And when you're off track, what helps more?", listOf(
-        Opt("encourage", "A kind word", "🤗"),
-        Opt("challenge", "A straight challenge", "🎯"),
-    )),
-    ChoiceQ("overwhelm", "On a heavy day, what do you want to see?", listOf(
-        Opt("one", "Just the next thing", "☝️"),
-        Opt("all", "Everything, so I can choose", "🗂️"),
-    )),
-    ChoiceQ("wellbeing", "Should I check in on how you're doing — not only what you're doing?", listOf(
-        Opt("yes", "Yes, please", "💜"),
-        Opt("light", "Keep it light", "🍃"),
-    )),
-    ChoiceQ("brief", "When should your morning brief land?", listOf(
-        Opt("6", "6:00", "🌄"), Opt("7", "7:00", "☕"), Opt("8", "8:00", "🍳"), Opt("none", "Skip the brief", "🚫"),
-    )),
-    TextQ("goodday", "Last one, {name}. In a sentence — what does a good day look like for you?", "e.g. focused morning, dinner with family", optional = true),
 )
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -195,7 +188,20 @@ private fun ConversationalProfile(onDone: () -> Unit) {
             Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                 if (i < total) {
                     val q = QUESTIONS[i]
-                    CoachBubble(text = q.coach.replace("{name}", name.ifBlank { "there" }))
+                    val nm = name.ifBlank { "there" }
+                    val mascotState = when (q.key) {
+                        "name" -> com.chiefofstaff.ui.components.MascotState.GREETING
+                        else -> com.chiefofstaff.ui.components.MascotState.THINKING
+                    }
+                    q.headline?.let { h ->
+                        Text(
+                            text = h.replace("{name}", nm),
+                            style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.ExtraBold),
+                            color = Palette.Ink,
+                        )
+                        Spacer(Modifier.height(20.dp))
+                    }
+                    CoachBubble(text = q.coach.replace("{name}", nm), mascotState = mascotState)
                     Spacer(Modifier.height(22.dp))
                     when (q) {
                         is ChoiceQ -> if (q.multi) {
@@ -220,42 +226,48 @@ private fun ConversationalProfile(onDone: () -> Unit) {
 
 @Composable
 private fun SingleChoice(q: ChoiceQ, onPick: (String) -> Unit) {
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+    var selectedValue by remember { mutableStateOf<String?>(null) }
+
     Column {
-        q.options.forEach { opt ->
-            OptionCard(opt.label, opt.emoji, selected = false, onClick = { onPick(opt.value) })
+        q.options.forEachIndexed { i, opt ->
+            OptionCard(
+                number = i + 1,
+                label = opt.label,
+                selected = selectedValue == opt.value,
+                onClick = {
+                    if (selectedValue == null) {   // lock after the first pick, then advance
+                        selectedValue = opt.value
+                        coroutineScope.launch {
+                            kotlinx.coroutines.delay(320)
+                            onPick(opt.value)
+                        }
+                    }
+                },
+            )
             Spacer(Modifier.height(12.dp))
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MultiChoice(q: ChoiceQ, answers: MutableMap<String, Any>, onContinue: () -> Unit) {
     @Suppress("UNCHECKED_CAST")
     val current = (answers[q.key] as? Set<String>) ?: emptySet()
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        q.options.forEach { opt ->
+    Column {
+        q.options.forEachIndexed { i, opt ->
             val on = opt.value in current
-            Box(
-                modifier = Modifier
-                    .padding(bottom = 10.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(if (on) Palette.Accent else Palette.SurfaceSunken)
-                    .clickable {
-                        answers[q.key] = if (on) current - opt.value else current + opt.value
-                    }
-                    .padding(horizontal = 16.dp, vertical = 11.dp),
-            ) {
-                Text(
-                    text = (opt.emoji?.let { "$it  " } ?: "") + opt.label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (on) Color.White else Palette.InkMuted,
-                )
-            }
+            OptionCard(
+                number = i + 1,
+                label = opt.label,
+                selected = on,
+                onClick = { answers[q.key] = if (on) current - opt.value else current + opt.value },
+            )
+            Spacer(Modifier.height(12.dp))
         }
+        Spacer(Modifier.height(12.dp))
+        CtaButton("Continue", onContinue, Modifier.fillMaxWidth())
     }
-    Spacer(Modifier.height(20.dp))
-    NeuButton("Continue", onContinue, Modifier.fillMaxWidth())
 }
 
 @Composable
@@ -270,12 +282,7 @@ private fun TextQuestion(q: TextQ, answers: MutableMap<String, Any>, onNext: () 
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(20.dp))
-        val canContinue = q.optional || value.isNotBlank()
-        if (canContinue) {
-            NeuButton("Continue", onNext, Modifier.fillMaxWidth())
-        } else {
-            NeuButtonNeutral("Continue", {}, Modifier.fillMaxWidth())
-        }
+        CtaButton("Continue", onClick = onNext, modifier = Modifier.fillMaxWidth(), enabled = q.optional || value.isNotBlank())
         if (q.optional) {
             Spacer(Modifier.height(6.dp))
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -286,54 +293,67 @@ private fun TextQuestion(q: TextQ, answers: MutableMap<String, Any>, onNext: () 
 }
 
 @Composable
-private fun OptionCard(label: String, emoji: String?, selected: Boolean, onClick: () -> Unit) {
-    NeuCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (emoji != null) {
-                Text(emoji, style = MaterialTheme.typography.titleLarge)
-                Spacer(Modifier.width(14.dp))
-            }
-            Text(
-                label,
-                style = MaterialTheme.typography.titleMedium,
-                color = if (selected) Palette.Accent else Palette.Ink,
-                modifier = Modifier.weight(1f),
+private fun OptionCard(number: Int, label: String, selected: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(16.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (selected) Modifier
+                    .clip(shape)
+                    .background(Palette.AccentSoft)
+                    .border(2.dp, Palette.Accent, shape)
+                else Modifier.neuSurface(cornerRadius = 16, elevation = 8.dp)
             )
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (selected) Palette.Accent else Palette.AccentSoft),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (selected) {
+                Icon(Icons.Filled.Check, contentDescription = "Selected", tint = Color.White, modifier = Modifier.size(22.dp))
+            } else {
+                Text(
+                    text = "%02d".format(number),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Palette.Accent,
+                )
+            }
         }
+        Spacer(Modifier.width(14.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = Palette.Ink,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
 // --- Coach, progress, summary -------------------------------------------------------------------
 
-/** A little assistant avatar (replaces the old meaningless dot) speaking the prompt in a bubble. */
+/** The mascot on the left, "speaking" the prompt in a tailed bubble to its right. */
 @Composable
-private fun CoachBubble(text: String) {
-    Row(verticalAlignment = Alignment.Top) {
-        CoachAvatar(size = 44)
-        Spacer(Modifier.width(12.dp))
+private fun CoachBubble(text: String, mascotState: com.chiefofstaff.ui.components.MascotState) {
+    Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
+        com.chiefofstaff.ui.components.ChiefMascot(state = mascotState, size = 74.dp)
+        Spacer(Modifier.width(10.dp))
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(4.dp, 20.dp, 20.dp, 20.dp))
+                .weight(1f)
+                // Sharp top-left corner reads as a tail pointing back at the mascot.
+                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 20.dp, bottomEnd = 20.dp, bottomStart = 20.dp))
                 .background(Palette.Surface)
                 .padding(16.dp),
         ) {
-            Text(text, style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
+            Text(text = text, style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
         }
-    }
-}
-
-@Composable
-private fun CoachAvatar(size: Int) {
-    Box(
-        modifier = Modifier.size(size.dp).clip(CircleShape).background(AvatarGradient),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            Icons.Filled.AutoAwesome,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size((size * 0.5f).dp),
-        )
     }
 }
 
@@ -349,20 +369,52 @@ private fun TopProgress(step: Int, total: Int, onBack: () -> Unit) {
             }
         }
         Spacer(Modifier.width(8.dp))
+        Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            repeat(total) { i ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(if (i <= step) Palette.Accent else Palette.SurfaceSunken),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The signature onboarding button: a solid violet face sitting on a darker "lip", so it looks
+ * pressable and dips into the lip when tapped.
+ */
+@Composable
+private fun CtaButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val lip = 5.dp
+    val press by androidx.compose.animation.core.animateDpAsState(if (pressed && enabled) lip else 0.dp, label = "cta")
+    val deep = Color(0xFF5B3FD9)
+    Box(modifier = modifier.height(56.dp + lip)) {
         Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(8.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(Palette.SurfaceSunken),
+            Modifier.fillMaxWidth().height(56.dp)
+                .offset(y = lip)
+                .clip(RoundedCornerShape(16.dp))
+                .background(if (enabled) deep else Palette.SurfaceSunken),
+        )
+        Box(
+            Modifier.fillMaxWidth().height(56.dp)
+                .offset(y = press)
+                .clip(RoundedCornerShape(16.dp))
+                .background(if (enabled) Palette.Accent else Palette.SurfaceSunken)
+                .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick),
+            contentAlignment = Alignment.Center,
         ) {
-            val fraction = ((step + 1).toFloat() / (total + 1).toFloat()).coerceIn(0.05f, 1f)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(fraction)
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Palette.Accent),
+            Text(
+                text = text.uppercase(),
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp,
+                ),
+                color = if (enabled) Color.White else Palette.InkFaint,
             )
         }
     }
@@ -372,19 +424,20 @@ private fun TopProgress(step: Int, total: Int, onBack: () -> Unit) {
 private fun Summary(answers: Map<String, Any>, onBegin: () -> Unit) {
     val name = (answers["name"] as? String).orEmpty().ifBlank { "there" }
     Column {
-        CoachBubble(text = "That's everything, $name. Here's what I'll keep in mind — and I'll keep learning as we go.")
+        CoachBubble(
+            text = "That's everything, $name. Here's what I'll keep in mind — and I'll keep learning as we go.",
+            mascotState = com.chiefofstaff.ui.components.MascotState.CELEBRATING
+        )
         Spacer(Modifier.height(20.dp))
         NeuCard(modifier = Modifier.fillMaxWidth()) {
             Column {
                 summaryLine(answers, "focus", "Focused on")
-                summaryLine(answers, "chronotype", "Sharpest")
-                summaryLine(answers, "nudge", "Nudges")
-                summaryLine(answers, "motivation", "When off track")
-                summaryLine(answers, "wellbeing", "Check-ins")
+                summaryLine(answers, "goal", "Primary Challenge")
+                summaryLine(answers, "nudge", "Working Style")
             }
         }
         Spacer(Modifier.height(24.dp))
-        NeuButton("Let's begin", onBegin, Modifier.fillMaxWidth())
+        CtaButton("Let's begin", onBegin, Modifier.fillMaxWidth())
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -495,50 +548,37 @@ private fun PermissionStep(onEnter: () -> Unit) {
             .padding(horizontal = 24.dp, vertical = 20.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            CoachAvatar(size = 44)
+            com.chiefofstaff.ui.components.ChiefMascot(
+                state = com.chiefofstaff.ui.components.MascotState.THINKING,
+                size = 64.dp
+            )
             Spacer(Modifier.width(12.dp))
             Text("A few permissions", style = MaterialTheme.typography.headlineMedium, color = Palette.Ink)
         }
         Spacer(Modifier.height(12.dp))
         Text(
-            "I live on your phone — nothing leaves the device without being assembled and redacted first. " +
-                "To capture and remind you reliably I need a few permissions. You grant each one yourself.",
-            style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted,
+            "I need 4 things to be a great Chief of Staff. Everything stays on your device.",
+            style = MaterialTheme.typography.bodyLarge, color = Palette.InkMuted,
         )
         Spacer(Modifier.height(24.dp))
 
         if (!consented) {
-            NeuCard(modifier = Modifier.fillMaxWidth()) {
-                Column {
-                    Text("Set up permissions now?", style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Tap Yes and I'll ask Android for the standard ones, then open the exact settings " +
-                            "screen for each special toggle — you flip it, I bring you back.",
-                        style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted,
-                    )
-                }
-            }
-            Spacer(Modifier.height(20.dp))
             NeuButton(
-                text = "Yes — set them up",
+                text = "Set them up",
                 onClick = {
                     consented = true
                     if (!runtimeGranted) runtimeLauncher.launch(Permissions.runtimeWanted())
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(6.dp))
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                GhostButton(text = "Not now", onClick = onEnter)
-            }
+            Spacer(Modifier.height(12.dp))
+            GhostButton("Skip for now", onClick = onEnter)
         } else {
-            SectionLabel("STANDARD")
+            SectionLabel("STANDARD PERMISSIONS")
             Spacer(Modifier.height(10.dp))
             PermRow(
                 PermItem(
-                    "Mic · notifications · calendar · camera",
-                    "Granted through the standard Android popup.",
+                    "Standard (Mic, Audio)", "For speaking to me and hearing responses.",
                     Icons.Filled.Mic, runtimeGranted,
                 ) { if (!runtimeGranted) runtimeLauncher.launch(Permissions.runtimeWanted()) },
             )

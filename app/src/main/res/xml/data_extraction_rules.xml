@@ -1,12 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- P8/§16.8: the encrypted DB is the source of truth and is backed up via SYS-10
-     (nightly encrypted export), never via cloud auto-backup. Disable device transfer
-     and cloud backup so the SQLCipher DB and key material never leave under OS control. -->
+<!--
+  Auto Backup (Android 12+). The whole point: a reinstall on the same device / account restores the
+  user's life graph automatically, so uninstalling is not data loss. The Room DB (cos.db) is plain
+  SQLite, so it restores cleanly. Everything is included by default; we exclude only:
+    - cos_provider_keys: API keys in a Keystore-backed encrypted store whose key never leaves the
+      device — the file can't be decrypted after a restore, so restoring it would crash. The user
+      re-enters keys (they're not personal data).
+    - androidx.work.workdb: WorkManager's own DB — rituals are re-scheduled on launch, so restoring
+      stale job state is worse than starting clean.
+    - backups / prompts: derived data (nightly JSON export; prompts re-seed from the APK's assets).
+-->
 <data-extraction-rules>
     <cloud-backup>
-        <exclude domain="root" path="." />
+        <exclude domain="sharedpref" path="cos_provider_keys.xml" />
+        <exclude domain="database" path="androidx.work.workdb" />
+        <exclude domain="file" path="backups" />
+        <exclude domain="file" path="prompts" />
     </cloud-backup>
     <device-transfer>
-        <exclude domain="root" path="." />
+        <exclude domain="sharedpref" path="cos_provider_keys.xml" />
+        <exclude domain="database" path="androidx.work.workdb" />
+        <exclude domain="file" path="backups" />
+        <exclude domain="file" path="prompts" />
     </device-transfer>
 </data-extraction-rules>

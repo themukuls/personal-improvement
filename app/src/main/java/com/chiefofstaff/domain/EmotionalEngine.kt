@@ -21,7 +21,7 @@ class EmotionalEngine(
 
     data class Read(val tone: Tone, val line: String)
 
-    suspend fun read(): Read {
+    suspend fun read(firm: Boolean = false): Read {
         val day = repo.today()
         val energy = day.energy ?: 3
         val mood = moodScore(day.mood)          // 1..5, or null when not checked in
@@ -45,7 +45,12 @@ class EmotionalEngine(
                 Tone.PROUD,
                 "You've been steady lately — that's the whole game. Keep it easy today.",
             )
-            else -> Read(Tone.STEADY, "Here's today. One thing at a time; I've got the rest.")
+            else -> Read(
+                Tone.STEADY,
+                // Respects the onboarding "how should I support you?" answer: firm is more directive.
+                if (firm) "Here's today. Pick the top one and start — I'll hold the rest."
+                else "Here's today. One thing at a time; I've got the rest.",
+            )
         }
     }
 

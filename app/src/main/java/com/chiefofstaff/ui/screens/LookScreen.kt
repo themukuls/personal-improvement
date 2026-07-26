@@ -1,7 +1,9 @@
 package com.chiefofstaff.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,22 +14,36 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import com.chiefofstaff.data.model.Domain
 import com.chiefofstaff.data.model.Mode
 import com.chiefofstaff.domain.ReductionEngine
 import com.chiefofstaff.ui.components.CosTextField
+import com.chiefofstaff.ui.components.GhostButton
+import com.chiefofstaff.ui.components.NeuButton
 import com.chiefofstaff.ui.components.NeuCard
 import com.chiefofstaff.ui.components.SectionLabel
 import com.chiefofstaff.ui.theme.Mono
@@ -55,11 +71,26 @@ fun LookScreen(
     onSetMode: (Mode) -> Unit,
     onRecordOutcome: (Long) -> Unit,
     onReschedule: () -> Unit,
+    memories: List<com.chiefofstaff.data.entity.Memory>,
+    onAddMemory: (String, java.time.Instant?, Boolean) -> Unit,
+    onDeleteMemory: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp),
     ) {
+        Spacer(Modifier.height(20.dp))
+        val mascotState = when {
+            state.results.isNotEmpty() -> com.chiefofstaff.ui.components.MascotState.CELEBRATING
+            state.query.isNotEmpty() -> com.chiefofstaff.ui.components.MascotState.THINKING
+            else -> com.chiefofstaff.ui.components.MascotState.CALM
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            com.chiefofstaff.ui.components.ChiefMascot(state = mascotState, size = 100.dp)
+        }
         Spacer(Modifier.height(20.dp))
         CosTextField(
             value = state.query,
@@ -103,201 +134,216 @@ fun LookScreen(
 
         // Mode now lives in the Now header (deduped); Look keeps only the longer-form quiet control.
 
-        Spacer(Modifier.height(20.dp))
-        CollapsedSection("DIRECTION", LookSection.DIRECTION, state, onToggleSection) {
-            if (state.valueLines.isEmpty() && state.goalLines.isEmpty() && state.projectLines.isEmpty()) {
-                Text("Your values, goals and projects form here.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (state.valueLines.isNotEmpty()) {
-                        SectionLabel("VALUES")
-                        state.valueLines.forEach { Text(it, style = MaterialTheme.typography.bodyLarge, color = Palette.Ink) }
-                    }
-                    if (state.goalLines.isNotEmpty()) {
-                        SectionLabel("GOALS")
-                        state.goalLines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted) }
-                    }
-                    if (state.projectLines.isNotEmpty()) {
-                        SectionLabel("PROJECTS")
-                        state.projectLines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted) }
-                    }
-                }
-            }
-        }
-        CollapsedSection("HORIZONS", LookSection.HORIZONS, state, onToggleSection) {
-            if (state.horizonGoals.isEmpty() && state.weekAttribution.isEmpty() && state.drift.isEmpty() && state.projections.isEmpty()) {
-                Text("Weekly, monthly and quarterly horizons form as goals accrue.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TrendLine("This week", "${state.weekLoad} committed")
-                    if (state.horizonGoals.isNotEmpty()) {
-                        SectionLabel("BY HORIZON")
-                        state.horizonGoals.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted) }
-                    }
-                    if (state.weekAttribution.isNotEmpty()) {
-                        SectionLabel("WHERE THE WEEK WENT")
-                        state.weekAttribution.forEach { TrendLine(it.substringBefore(":"), it.substringAfter(": ")) }
-                    }
-                    if (state.drift.isNotEmpty()) {
-                        SectionLabel("DRIFT")
-                        state.drift.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.Accent) }
-                    }
-                    if (state.projections.isNotEmpty()) {
-                        SectionLabel("ON CURRENT PACE")
-                        state.projections.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted) }
-                    }
-                }
-            }
-        }
-        CollapsedSection("TIMELINE", LookSection.TIMELINE, state, onToggleSection) {
-            if (state.timeline.isEmpty()) Text("No captures yet.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
-            else state.timeline.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted, modifier = Modifier.padding(vertical = 3.dp)) }
-        }
-        CollapsedSection("TRENDS", LookSection.TRENDS, state, onToggleSection) {
-            val pct = state.consistencyPct
-            val mae = state.predictionAccuracyHours
-            if (pct == null && mae == null && state.healthLines.isEmpty()) {
-                Text("Trends appear when there is data to trend.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (pct != null) TrendLine("Consistency", "$pct% over 30 days")
-                    if (mae != null) TrendLine("Self-accuracy", "estimates off by ~${"%.1f".format(mae)}h")
-                    state.accuracyReport?.let { Text(it, style = Mono.Status, color = Palette.InkFaint) }
-                    state.healthLines.forEach { TrendLine(it.substringBefore(":"), it.substringAfter(": ")) }
-                    if (state.scorecard.isNotEmpty()) {
-                        Spacer(Modifier.height(4.dp))
-                        SectionLabel("DOMAIN SCORECARD")
-                        state.scorecard.forEach { TrendLine(it.substringBeforeLast(' '), it.substringAfterLast(' ')) }
-                    }
-                    state.tokensLine?.let {
-                        Spacer(Modifier.height(4.dp))
-                        Text(it, style = Mono.Status, color = Palette.InkGhost)
-                    }
-                }
-            }
-        }
-        CollapsedSection("DOMAINS", LookSection.DOMAINS, state, onToggleSection) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (state.domainCounts.isEmpty()) {
-                    Text("Nothing open. Domains fill as you go.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+        Spacer(Modifier.height(16.dp))
+        MemorySection(memories = memories, onAdd = onAddMemory, onDelete = onDeleteMemory)
+
+        if (state.query.isEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            SectionLabel("STRATEGY & GROWTH")
+            Spacer(Modifier.height(12.dp))
+            CollapsedSection("DIRECTION", LookSection.DIRECTION, state, onToggleSection) {
+                if (state.valueLines.isEmpty() && state.goalLines.isEmpty() && state.projectLines.isEmpty()) {
+                    Text("Your values, goals and projects form here.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
                 } else {
-                    // ACC-14 — bulk renegotiation.
-                    Row { QuietChip("Push today → tomorrow") { onReschedule() } }
-                }
-                // RES-02 — per-domain backlog with one-action bankruptcy.
-                state.domainCounts.forEach { (domain, count) ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "${domain.name.lowercase().replaceFirstChar { it.uppercase() }} — $count open",
-                            style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted,
-                            modifier = Modifier.weight(1f),
-                        )
-                        QuietChip("Clear backlog") { onBankruptcy(domain) }
-                    }
-                }
-                // RES-04 — the assistant's own reduction proposals.
-                if (state.proposals.isNotEmpty()) {
-                    Spacer(Modifier.height(6.dp))
-                    SectionLabel("SUGGEST DROPPING")
-                    state.proposals.forEach { item ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(item.label, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted, modifier = Modifier.weight(1f))
-                            QuietChip("Drop") { onDrop(item) }
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        if (state.valueLines.isNotEmpty()) {
+                            SectionLabel("VALUES")
+                            state.valueLines.forEach { Text(it, style = MaterialTheme.typography.bodyLarge, color = Palette.Ink) }
+                        }
+                        if (state.goalLines.isNotEmpty()) {
+                            SectionLabel("GOALS")
+                            state.goalLines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted) }
+                        }
+                        if (state.projectLines.isNotEmpty()) {
+                            SectionLabel("PROJECTS")
+                            state.projectLines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted) }
                         }
                     }
                 }
             }
-        }
-        CollapsedSection("WAITING ON", LookSection.WAITING, state, onToggleSection) {
-            if (state.waiting.isEmpty()) {
-                Text("Things others owe you show up here.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    state.waiting.forEach { w ->
-                        Column {
-                            Text(w.what, style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
-                            Text("from ${w.who}${if (w.context.isNotBlank()) " · ${w.context}" else ""}",
-                                style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+            CollapsedSection("HORIZONS", LookSection.HORIZONS, state, onToggleSection) {
+                if (state.horizonGoals.isEmpty() && state.weekAttribution.isEmpty() && state.drift.isEmpty() && state.projections.isEmpty()) {
+                    Text("Weekly, monthly and quarterly horizons form as goals accrue.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TrendLine("This week", "${state.weekLoad} committed")
+                        if (state.horizonGoals.isNotEmpty()) {
+                            SectionLabel("BY HORIZON")
+                            state.horizonGoals.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted) }
+                        }
+                        if (state.weekAttribution.isNotEmpty()) {
+                            SectionLabel("WHERE THE WEEK WENT")
+                            state.weekAttribution.forEach { TrendLine(it.substringBefore(":"), it.substringAfter(": ")) }
+                        }
+                        if (state.drift.isNotEmpty()) {
+                            SectionLabel("DRIFT")
+                            state.drift.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.Accent) }
+                        }
+                        if (state.projections.isNotEmpty()) {
+                            SectionLabel("ON CURRENT PACE")
+                            state.projections.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted) }
+                        }
+                    }
+                }
+            }
+            CollapsedSection("TRENDS", LookSection.TRENDS, state, onToggleSection) {
+                val pct = state.consistencyPct
+                val mae = state.predictionAccuracyHours
+                if (pct == null && mae == null && state.healthLines.isEmpty()) {
+                    Text("Trends appear when there is data to trend.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (pct != null) TrendLine("Consistency", "$pct% over 30 days")
+                        if (mae != null) TrendLine("Self-accuracy", "estimates off by ~${"%.1f".format(mae)}h")
+                        state.accuracyReport?.let { Text(it, style = Mono.Status, color = Palette.InkFaint) }
+                        state.healthLines.forEach { TrendLine(it.substringBefore(":"), it.substringAfter(": ")) }
+                        if (state.scorecard.isNotEmpty()) {
                             Spacer(Modifier.height(4.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                QuietChip("Chase") { onChase(w.id) }
-                                QuietChip("Got it") { onResolveWaiting(w.id) }
+                            SectionLabel("DOMAIN SCORECARD")
+                            state.scorecard.forEach { TrendLine(it.substringBeforeLast(' '), it.substringAfterLast(' ')) }
+                        }
+                        state.tokensLine?.let {
+                            Spacer(Modifier.height(4.dp))
+                            Text(it, style = Mono.Status, color = Palette.InkGhost)
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+            SectionLabel("OPERATIONS & ACTION")
+            Spacer(Modifier.height(12.dp))
+            CollapsedSection("DOMAINS", LookSection.DOMAINS, state, onToggleSection) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (state.domainCounts.isEmpty()) {
+                        Text("Nothing open. Domains fill as you go.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+                    } else {
+                        // ACC-14 — bulk renegotiation.
+                        Row { QuietChip("Push today → tomorrow") { onReschedule() } }
+                    }
+                    // RES-02 — per-domain backlog with one-action bankruptcy.
+                    state.domainCounts.forEach { (domain, count) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "${domain.name.lowercase().replaceFirstChar { it.uppercase() }} — $count open",
+                                style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted,
+                                modifier = Modifier.weight(1f),
+                            )
+                            QuietChip("Clear backlog") { onBankruptcy(domain) }
+                        }
+                    }
+                    // RES-04 — the assistant's own reduction proposals.
+                    if (state.proposals.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        SectionLabel("SUGGEST DROPPING")
+                        state.proposals.forEach { item ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(item.label, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted, modifier = Modifier.weight(1f))
+                                QuietChip("Drop") { onDrop(item) }
                             }
                         }
                     }
                 }
             }
-        }
-        CollapsedSection("PEOPLE", LookSection.PEOPLE, state, onToggleSection) {
-            if (state.people.isEmpty()) {
-                Text("People appear once people exist.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    state.people.forEach { p ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(p.name, style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
-                                if (p.sub.isNotBlank()) {
+            CollapsedSection("DECISIONS", LookSection.DECISIONS, state, onToggleSection) {
+                if (state.decisions.isEmpty()) {
+                    Text("Decisions you make in Decide mode land here, with a review date.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        state.decisions.forEach { d ->
+                            Column {
+                                Text(d.question, style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
+                                Text("→ ${d.chosen}", style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted)
+                                Spacer(Modifier.height(4.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        p.sub,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = if (p.overdue) Palette.Accent else Palette.InkFaint,
+                                        if (d.hasOutcome) "reviewed" else d.reviewLabel,
+                                        style = Mono.Status,
+                                        color = Palette.InkFaint,
+                                        modifier = Modifier.weight(1f),
                                     )
+                                    if (!d.hasOutcome) QuietChip("Mark reviewed") { onRecordOutcome(d.id) }
                                 }
                             }
-                            QuietChip("Log contact") { onLogContact(p.id) }
                         }
                     }
                 }
             }
-        }
-        CollapsedSection("DECISIONS", LookSection.DECISIONS, state, onToggleSection) {
-            if (state.decisions.isEmpty()) {
-                Text("Decisions you make in Decide mode land here, with a review date.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    state.decisions.forEach { d ->
-                        Column {
-                            Text(d.question, style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
-                            Text("→ ${d.chosen}", style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted)
-                            Spacer(Modifier.height(4.dp))
+            CollapsedSection("WAITING ON", LookSection.WAITING, state, onToggleSection) {
+                if (state.waiting.isEmpty()) {
+                    Text("Things others owe you show up here.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        state.waiting.forEach { w ->
+                            Column {
+                                Text(w.what, style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
+                                Text("from ${w.who}${if (w.context.isNotBlank()) " · ${w.context}" else ""}",
+                                    style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+                                Spacer(Modifier.height(4.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    QuietChip("Chase") { onChase(w.id) }
+                                    QuietChip("Got it") { onResolveWaiting(w.id) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+            SectionLabel("LEDGER & HISTORY")
+            Spacer(Modifier.height(12.dp))
+            CollapsedSection("TIMELINE", LookSection.TIMELINE, state, onToggleSection) {
+                if (state.timeline.isEmpty()) Text("No captures yet.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+                else state.timeline.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted, modifier = Modifier.padding(vertical = 3.dp)) }
+            }
+            CollapsedSection("CONVERSATIONS", LookSection.CONVERSATIONS, state, onToggleSection) {
+                if (state.sessions.isEmpty()) {
+                    Text("Past conversations are searchable here.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        state.sessions.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted) }
+                    }
+                }
+            }
+            CollapsedSection("PEOPLE", LookSection.PEOPLE, state, onToggleSection) {
+                if (state.people.isEmpty()) {
+                    Text("People appear once people exist.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        state.people.forEach { p ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    if (d.hasOutcome) "reviewed" else d.reviewLabel,
-                                    style = Mono.Status,
-                                    color = Palette.InkFaint,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                if (!d.hasOutcome) QuietChip("Mark reviewed") { onRecordOutcome(d.id) }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(p.name, style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
+                                    if (p.sub.isNotBlank()) {
+                                        Text(
+                                            p.sub,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = if (p.overdue) Palette.Accent else Palette.InkFaint,
+                                        )
+                                    }
+                                }
+                                QuietChip("Log contact") { onLogContact(p.id) }
                             }
                         }
                     }
                 }
             }
-        }
-        CollapsedSection("REFERENCE & EMERGENCY", LookSection.REFERENCES, state, onToggleSection) {
-            if (state.references.isEmpty()) {
-                Text("Photograph a document and its details land here, encrypted.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    state.references.forEach { r ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(r.label, style = MaterialTheme.typography.titleMedium, color = if (r.emergency) Palette.Accent else Palette.Ink)
-                                Text(r.value, style = MaterialTheme.typography.bodyLarge, color = Palette.InkMuted)
+            CollapsedSection("REFERENCE & EMERGENCY", LookSection.REFERENCES, state, onToggleSection) {
+                if (state.references.isEmpty()) {
+                    Text("Photograph a document and its details land here, encrypted.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        state.references.forEach { r ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(r.label, style = MaterialTheme.typography.titleMedium, color = if (r.emergency) Palette.Accent else Palette.Ink)
+                                    Text(r.value, style = MaterialTheme.typography.bodyLarge, color = Palette.InkMuted)
+                                }
+                                Text(r.sub, style = Mono.Status, color = Palette.InkFaint)
                             }
-                            Text(r.sub, style = Mono.Status, color = Palette.InkFaint)
                         }
                     }
-                }
-            }
-        }
-        CollapsedSection("CONVERSATIONS", LookSection.CONVERSATIONS, state, onToggleSection) {
-            if (state.sessions.isEmpty()) {
-                Text("Past conversations are searchable here.", style = MaterialTheme.typography.bodyMedium, color = Palette.InkFaint)
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    state.sessions.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted) }
                 }
             }
         }
@@ -315,6 +361,111 @@ private fun QuietChip(text: String, onClick: () -> Unit) {
     ) {
         Text(text, style = MaterialTheme.typography.labelLarge, color = Palette.InkMuted)
     }
+}
+
+@Composable
+private fun MemorySection(
+    memories: List<com.chiefofstaff.data.entity.Memory>,
+    onAdd: (String, java.time.Instant?, Boolean) -> Unit,
+    onDelete: (Long) -> Unit,
+) {
+    var showAdd by remember { mutableStateOf(false) }
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SectionLabel("MEMORY", modifier = Modifier.weight(1f))
+            Box(
+                modifier = Modifier.size(32.dp).clip(CircleShape).background(Palette.Accent).clickable { showAdd = true },
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.Outlined.Add, "Add memory", tint = Color.White, modifier = Modifier.size(20.dp)) }
+        }
+        Spacer(Modifier.height(10.dp))
+        if (memories.isEmpty()) {
+            NeuCard(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "Ask me to remember dates — \"remember mom's birthday is March 10\" — and I'll nudge you before them. Or tap +.",
+                    style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted,
+                )
+            }
+        } else {
+            memories.forEach { m ->
+                MemoryRow(m, onDelete = { onDelete(m.id) })
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+    if (showAdd) {
+        AddMemoryDialog(
+            onSave = { t, at, hasTime -> onAdd(t, at, hasTime); showAdd = false },
+            onDismiss = { showAdd = false },
+        )
+    }
+}
+
+@Composable
+private fun MemoryRow(m: com.chiefofstaff.data.entity.Memory, onDelete: () -> Unit) {
+    NeuCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(m.text, style = MaterialTheme.typography.titleSmall, color = Palette.Ink)
+                m.remindAt?.let { at ->
+                    val ldt = java.time.LocalDateTime.ofInstant(at, java.time.ZoneId.systemDefault())
+                    val fmt = if (m.hasTime) java.time.format.DateTimeFormatter.ofPattern("EEE d MMM · HH:mm")
+                    else java.time.format.DateTimeFormatter.ofPattern("EEE d MMM")
+                    Text(ldt.format(fmt), style = Mono.Status, color = Palette.Accent)
+                }
+            }
+            Box(
+                modifier = Modifier.size(30.dp).clip(CircleShape).clickable(onClick = onDelete),
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.Outlined.Close, "Delete", tint = Palette.InkFaint, modifier = Modifier.size(18.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun AddMemoryDialog(onSave: (String, java.time.Instant?, Boolean) -> Unit, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val zone = java.time.ZoneId.systemDefault()
+    var text by remember { mutableStateOf("") }
+    var date by remember { mutableStateOf<java.time.LocalDate?>(null) }
+    var time by remember { mutableStateOf<java.time.LocalTime?>(null) }
+    Dialog(onDismissRequest = onDismiss) {
+        NeuCard(modifier = Modifier.fillMaxWidth()) {
+            Column {
+                Text("New memory", style = MaterialTheme.typography.titleLarge, color = Palette.Ink)
+                Spacer(Modifier.height(14.dp))
+                CosTextField(value = text, onValueChange = { text = it }, placeholder = "e.g. Mom's birthday", modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(14.dp))
+                SectionLabel("REMIND ME AROUND")
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    MemChip(date?.format(java.time.format.DateTimeFormatter.ofPattern("EEE d MMM")) ?: "Pick date", Modifier.weight(1f)) {
+                        val init = date ?: java.time.LocalDate.now()
+                        android.app.DatePickerDialog(context, { _, y, mo, d -> date = java.time.LocalDate.of(y, mo + 1, d) }, init.year, init.monthValue - 1, init.dayOfMonth).show()
+                    }
+                    MemChip(time?.let { "%02d:%02d".format(it.hour, it.minute) } ?: "Time (optional)", Modifier.weight(1f)) {
+                        val init = time ?: java.time.LocalTime.of(9, 0)
+                        android.app.TimePickerDialog(context, { _, h, mi -> time = java.time.LocalTime.of(h, mi) }, init.hour, init.minute, false).show()
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+                NeuButton("Save", onClick = {
+                    val at = date?.let { d -> d.atTime(time ?: java.time.LocalTime.of(9, 0)).atZone(zone).toInstant() }
+                    onSave(text, at, time != null)
+                }, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(6.dp))
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { GhostButton("Cancel", onClick = onDismiss) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MemChip(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier.clip(RoundedCornerShape(14.dp)).background(Palette.SurfaceSunken).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) { Text(text, style = MaterialTheme.typography.titleSmall, color = Palette.Ink) }
 }
 
 @Composable

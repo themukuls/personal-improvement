@@ -52,7 +52,6 @@ import com.chiefofstaff.data.entity.EventEntity
 import com.chiefofstaff.ui.components.CosTextField
 import com.chiefofstaff.ui.components.GhostButton
 import com.chiefofstaff.ui.components.NeuButton
-import com.chiefofstaff.ui.components.NeuButtonNeutral
 import com.chiefofstaff.ui.components.NeuCard
 import com.chiefofstaff.ui.components.SectionLabel
 import com.chiefofstaff.ui.theme.Mono
@@ -76,18 +75,20 @@ private data class CalItem(
     val done: Boolean = false,
 )
 
-/** Editor state for adding or editing a calendar event. */
+/** Editor state for adding or editing a calendar item — an event, or an existing task. */
 private data class EventDraft(
-    val eventId: Long?,          // null = new
+    val itemId: Long?,           // null = new (always an event)
     val title: String,
     val start: LocalDateTime,
     val durationMin: Int,
+    val isEvent: Boolean = true, // false = editing a task (commitment): no duration, writes to commitment
 )
 
 /**
- * A month calendar with a load heatmap, and full event management: add via the + button, long-press
- * an event to edit or delete it. Editing lets you set the title, the start date & time, and pick a
- * duration (15 / 30 / 45 / 60 min) for that start. Reached from the header calendar icon.
+ * A month calendar with a load heatmap, and full management of everything on it — events and tasks
+ * alike. Tap any item once to edit it (title, start date & time, and, for events, a duration of
+ * 15 / 30 / 45 / 60 min); long-press it to delete. Add new events with the + button. Reached from
+ * the header calendar icon.
  */
 @Composable
 fun CalendarScreen(container: AppContainer, onBack: () -> Unit) {
@@ -138,7 +139,6 @@ fun CalendarScreen(container: AppContainer, onBack: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Palette.Base)
             .safeDrawingPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 22.dp, vertical = 12.dp),
@@ -207,11 +207,22 @@ fun CalendarScreen(container: AppContainer, onBack: () -> Unit) {
             }
         } else {
             items.forEach { item ->
-                DayItemRow(item = item, onLongPress = { if (item.isEvent) menuFor = item })
+                DayItemRow(
+                    item = item,
+                    onClick = {
+                        draft = EventDraft(
+                            itemId = item.id, title = item.title,
+                            start = LocalDateTime.ofInstant(Instant.ofEpochMilli(item.startMillis), zone),
+                            durationMin = item.minutes.coerceAtLeast(15),
+                            isEvent = item.isEvent,
+                        )
+                    },
+                    onLongPress = { menuFor = item },
+                )
                 Spacer(Modifier.height(10.dp))
             }
             Text(
-                "Long-press an event to edit or delete it.",
+                "Tap to edit · long-press to delete.",
                 style = MaterialTheme.typography.bodySmall, color = Palette.InkFaint,
                 modifier = Modifier.padding(top = 2.dp),
             )
@@ -219,41 +230,56 @@ fun CalendarScreen(container: AppContainer, onBack: () -> Unit) {
         Spacer(Modifier.height(24.dp))
     }
 
-    // Long-press action sheet.
+    // Long-press → delete confirmation (events and tasks alike).
     menuFor?.let { item ->
-        EventActionDialog(
+        DeleteConfirmDialog(
             title = item.title,
-            onEdit = {
-                draft = EventDraft(
-                    eventId = item.id, title = item.title,
-                    start = LocalDateTime.ofInstant(Instant.ofEpochMilli(item.startMillis), zone),
-                    durationMin = item.minutes.coerceAtLeast(15),
-                )
+            isEvent = item.isEvent,
+            onDelete = {
+                scope.launch {
+                    if (item.isEvent) container.repo.graph.deleteEvent(item.id)
+                    else container.repo.commitments.deleteById(item.id)
+                    refresh++
+                }
                 menuFor = null
             },
-            onDelete = { scope.launch { container.repo.graph.deleteEvent(item.id); refresh++ }; menuFor = null },
             onDismiss = { menuFor = null },
         )
     }
 
-    // Add / edit editor.
+    // Tap-to-edit editor: writes back to the event or the task depending on what was tapped.
     draft?.let { d ->
         EventEditorDialog(
             draft = d,
             onChange = { draft = it },
             onSave = {
                 scope.launch {
-                    val start = d.start.atZone(zone).toInstant()
-                    container.repo.graph.upsertEvent(
-                        EventEntity(
-                            id = d.eventId ?: 0L,
-                            title = d.title.ifBlank { "Event" },
-                            start = start,
-                            end = start.plusSeconds(d.durationMin * 60L),
-                            source = "manual",
-                            createdAt = clock.now(),
+                    val startInstant = d.start.atZone(zone).toInstant()
+                    if (d.isEvent) {
+                        container.repo.graph.upsertEvent(
+                            EventEntity(
+                                id = d.itemId ?: 0L,
+                                title = d.title.ifBlank { "Event" },
+                                start = startInstant,
+                                end = startInstant.plusSeconds(d.durationMin * 60L),
+                                source = "manual",
+                                createdAt = clock.now(),
+                            )
                         )
-                    )
+                    } else d.itemId?.let { id ->
+                        // Editing a task: keep the commitment, just change its title and due time.
+                        container.repo.commitments.byId(id)?.let { c ->
+                            val now = clock.now()
+                            container.repo.commitments.update(
+                                c.copy(
+                                    what = d.title.ifBlank { c.what },
+                                    dueAt = startInstant,
+                                    updatedAt = now,
+                                    lastTouchedAt = now,
+                                )
+                            )
+                        }
+                    }
                     refresh++
                 }
                 selected = d.start.toLocalDate()
@@ -275,19 +301,18 @@ private fun AddEventButton(onClick: () -> Unit) {
 }
 
 @Composable
-private fun EventActionDialog(title: String, onEdit: () -> Unit, onDelete: () -> Unit, onDismiss: () -> Unit) {
+private fun DeleteConfirmDialog(title: String, isEvent: Boolean, onDelete: () -> Unit, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         NeuCard(modifier = Modifier.fillMaxWidth()) {
             Column {
-                Text(title, style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
-                Spacer(Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    NeuButton("Edit", onClick = onEdit, modifier = Modifier.weight(1f))
-                    NeuButtonNeutral("Delete", onClick = onDelete, modifier = Modifier.weight(1f))
-                }
+                Text("Delete this ${if (isEvent) "event" else "task"}?", style = MaterialTheme.typography.titleLarge, color = Palette.Ink)
+                Spacer(Modifier.height(8.dp))
+                Text(title, style = MaterialTheme.typography.bodyMedium, color = Palette.InkMuted)
+                Spacer(Modifier.height(18.dp))
+                NeuButton("Delete", onClick = onDelete, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(6.dp))
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    GhostButton("Cancel", onClick = onDismiss)
+                    GhostButton("Keep it", onClick = onDismiss)
                 }
             }
         }
@@ -306,7 +331,11 @@ private fun EventEditorDialog(
         NeuCard(modifier = Modifier.fillMaxWidth()) {
             Column {
                 Text(
-                    if (draft.eventId == null) "New event" else "Edit event",
+                    when {
+                        draft.itemId == null -> "New event"
+                        draft.isEvent -> "Edit event"
+                        else -> "Edit task"
+                    },
                     style = MaterialTheme.typography.titleLarge, color = Palette.Ink,
                 )
                 Spacer(Modifier.height(16.dp))
@@ -341,19 +370,22 @@ private fun EventEditorDialog(
                     }
                 }
 
-                Spacer(Modifier.height(16.dp))
-                SectionLabel("FOR HOW LONG")
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(15 to "15 min", 30 to "30 min", 45 to "45 min", 60 to "1 hour").forEach { (mins, label) ->
-                        DurationChip(label, selected = draft.durationMin == mins, modifier = Modifier.weight(1f)) {
-                            onChange(draft.copy(durationMin = mins))
+                // Duration only applies to events; a task is a single due moment.
+                if (draft.isEvent) {
+                    Spacer(Modifier.height(16.dp))
+                    SectionLabel("FOR HOW LONG")
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(15 to "15 min", 30 to "30 min", 45 to "45 min", 60 to "1 hour").forEach { (mins, label) ->
+                            DurationChip(label, selected = draft.durationMin == mins, modifier = Modifier.weight(1f)) {
+                                onChange(draft.copy(durationMin = mins))
+                            }
                         }
                     }
                 }
 
                 Spacer(Modifier.height(20.dp))
-                NeuButton(if (draft.eventId == null) "Add event" else "Save", onClick = onSave, modifier = Modifier.fillMaxWidth())
+                NeuButton(if (draft.itemId == null) "Add event" else "Save", onClick = onSave, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(6.dp))
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     GhostButton("Cancel", onClick = onDismiss)
@@ -456,8 +488,8 @@ private fun HeatLegend() {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun DayItemRow(item: CalItem, onLongPress: () -> Unit) {
-    NeuCard(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = {}, onLongClick = onLongPress)) {
+private fun DayItemRow(item: CalItem, onClick: () -> Unit, onLongPress: () -> Unit) {
+    NeuCard(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongPress)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 item.time ?: "—",

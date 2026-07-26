@@ -1,5 +1,6 @@
 package com.chiefofstaff
 
+import android.app.backup.BackupManager
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -64,6 +65,16 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleShare(intent)
+    }
+
+    /**
+     * Whenever the user leaves the app, tell the OS its data changed so a fresh Auto Backup is
+     * scheduled soon (rather than waiting for the once-a-day default). Fully automatic — the system
+     * still runs it later under its own conditions (idle, charging, unmetered). Zero user action.
+     */
+    override fun onStop() {
+        super.onStop()
+        runCatching { BackupManager(this).dataChanged() }
     }
 
     /** CAP-18 — share-sheet capture from any app. */

@@ -15,6 +15,7 @@ import com.chiefofstaff.data.model.CommitmentState
 import com.chiefofstaff.data.model.Domain
 import com.chiefofstaff.domain.EmotionalEngine
 import com.chiefofstaff.domain.PlanGenerator
+import com.chiefofstaff.intervention.MemoryReminderScheduler
 import com.chiefofstaff.intervention.RitualScheduler
 import com.chiefofstaff.llm.LlmOrchestrator
 import com.chiefofstaff.llm.TaskId
@@ -42,6 +43,7 @@ class VoiceCommandProcessor(
     private val clock: Clock,
     private val orchestrator: LlmOrchestrator,
     private val ritualScheduler: RitualScheduler,
+    private val memoryReminderScheduler: MemoryReminderScheduler,
     private val planGenerator: PlanGenerator,
     private val emotionalEngine: EmotionalEngine,
 ) {
@@ -105,8 +107,15 @@ class VoiceCommandProcessor(
             }
             "set_reminder", "create_task" -> reminder(title, whenAt, hasTime, domain, now, override = reply)
             "note" -> {
-                repo.graph.insertNote(Note(text = title, tags = listOf("voice"), createdAt = now))
-                Result(reply ?: "Noted — I'll remember that.")
+                if (whenAt != null) {
+                    // A dated memory — save it and schedule the reminder set (day-before, day-of, etc.).
+                    val id = repo.saveMemory(title, whenAt, hasTime)
+                    runCatching { memoryReminderScheduler.schedule(id, title, whenAt, hasTime) }
+                    Result(reply ?: "I'll remember \"$title\" — and nudge you before ${fmt(whenAt)}.")
+                } else {
+                    repo.graph.insertNote(Note(text = title, tags = listOf("voice"), createdAt = now))
+                    Result(reply ?: "Noted — I'll remember that.")
+                }
             }
             "brief" -> Result(buildBrief())
             else -> chat(raw)

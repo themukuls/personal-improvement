@@ -35,7 +35,17 @@ class RitualScheduler(
     }
 
     fun schedule(ritual: Ritual) {
-        val triggerAt = nextOccurrence(LocalTime.of(ritual.hour, ritual.minute), ritual.dayOfWeek)
+        // The morning brief honours the user's chosen hour (or is turned off) from onboarding/settings.
+        if (ritual == Ritual.MORNING_BRIEF) {
+            val hour = configuredBriefHour()
+            if (hour == null) { cancel(ritual); AppLog.i("scheduler", "morning brief off"); return }
+            arm(ritual, nextOccurrence(LocalTime.of(hour, 0)))
+            return
+        }
+        arm(ritual, nextOccurrence(LocalTime.of(ritual.hour, ritual.minute), ritual.dayOfWeek))
+    }
+
+    private fun arm(ritual: Ritual, triggerAt: Long) {
         val pi = ritualPendingIntent(ritual)
         // Guarded: on Android 12+ exact alarms require the (granted, sideloaded) permission.
         if (canScheduleExact()) {
@@ -46,6 +56,19 @@ class RitualScheduler(
             AppLog.w("scheduler", "exact alarms not permitted; using inexact for $ritual")
         }
     }
+
+    /** Cancel a ritual's alarm (used when the morning brief is turned off). */
+    fun cancel(ritual: Ritual) {
+        alarmManager.cancel(ritualPendingIntent(ritual))
+    }
+
+    /** The brief hour from the profile: "6"/"7"/"8" → that hour, "none" → off, blank → default 06:00. */
+    private fun configuredBriefHour(): Int? =
+        when (val v = com.chiefofstaff.system.UserProfile(context).briefHour.trim()) {
+            "none" -> null
+            "" -> 6
+            else -> v.toIntOrNull()?.coerceIn(0, 23) ?: 6
+        }
 
     /** INT-02 — a per-commitment exact alarm set by voice ("remind me at 4"). */
     fun scheduleCommitment(commitmentId: Long, atMillis: Long) {

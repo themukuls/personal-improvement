@@ -39,14 +39,14 @@ fun Modifier.neuSurface(
     this
         .drawBehind {
             val radiusPx = cornerRadius.dp.toPx()
-            // A gentle shadow: modest blur, a small downward offset, low alpha so it stays subtle.
-            val blur = (elevation.toPx()) * 0.9f
-            val dy = (elevation.toPx()) * 0.35f
+            // A much softer, premium shadow: larger blur, smaller vertical offset, lower alpha.
+            val blur = (elevation.toPx()) * 1.5f
+            val dy = (elevation.toPx()) * 0.25f
             drawIntoCanvas { canvas ->
                 val paint = Paint()
                 val fw = paint.asFrameworkPaint()
                 fw.color = android.graphics.Color.TRANSPARENT
-                fw.setShadowLayer(blur, 0f, dy, dark.copy(alpha = 0.55f).toArgb())
+                fw.setShadowLayer(blur, 0f, dy, dark.copy(alpha = 0.35f).toArgb())
                 canvas.drawRoundRect(0f, 0f, size.width, size.height, radiusPx, radiusPx, paint)
             }
         }

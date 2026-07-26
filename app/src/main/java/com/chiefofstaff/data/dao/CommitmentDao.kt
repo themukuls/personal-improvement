@@ -13,6 +13,10 @@ interface CommitmentDao {
     @Insert suspend fun insert(c: Commitment): Long
     @Update suspend fun update(c: Commitment)
 
+    /** Hard-delete a single commitment (calendar "delete", user-initiated). */
+    @Query("DELETE FROM commitment WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
     @Query("SELECT * FROM commitment WHERE id = :id")
     suspend fun byId(id: Long): Commitment?
 
@@ -70,6 +74,13 @@ interface CommitmentDao {
 
     @Query("SELECT COUNT(*) FROM commitment WHERE state = 'DONE' AND updatedAt >= :since")
     suspend fun doneCountSince(since: Long): Int
+
+    /** Per-window completion, for the day-by-day progress view. */
+    @Query("SELECT COUNT(*) FROM commitment WHERE state = 'DONE' AND updatedAt >= :start AND updatedAt < :end")
+    suspend fun doneBetween(start: Long, end: Long): Int
+
+    @Query("SELECT COUNT(*) FROM commitment WHERE state IN ('DONE','SKIPPED','DROPPED') AND updatedAt >= :start AND updatedAt < :end")
+    suspend fun resolvedBetween(start: Long, end: Long): Int
 
     /** REV-05 — commitments touched in a window, for the per-domain scorecard. */
     @Query("SELECT * FROM commitment WHERE updatedAt >= :since")

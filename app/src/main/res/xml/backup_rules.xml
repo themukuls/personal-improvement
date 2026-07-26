@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Legacy Auto Backup (Android 11 and below). Same intent as data_extraction_rules.xml: include
+  everything, exclude the un-restorable encrypted keys, WorkManager's DB, and derived files.
+-->
+<full-backup-content>
+    <exclude domain="sharedpref" path="cos_provider_keys.xml" />
+    <exclude domain="database" path="androidx.work.workdb" />
+    <exclude domain="file" path="backups" />
+    <exclude domain="file" path="prompts" />
+</full-backup-content>

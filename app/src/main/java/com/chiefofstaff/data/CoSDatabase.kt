@@ -20,6 +20,7 @@ import com.chiefofstaff.data.entity.Decision
 import com.chiefofstaff.data.entity.EventEntity
 import com.chiefofstaff.data.entity.Goal
 import com.chiefofstaff.data.entity.Interaction
+import com.chiefofstaff.data.entity.Memory
 import com.chiefofstaff.data.entity.Message
 import com.chiefofstaff.data.entity.ModeState
 import com.chiefofstaff.data.entity.Note
@@ -46,9 +47,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ReferenceItem::class, EventEntity::class, Note::class, Occasion::class,
         DayState::class, ModeState::class, Prediction::class,
         AnticipationItem::class, NotificationLog::class,
-        Session::class, Message::class,
+        Session::class, Message::class, Memory::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -70,8 +71,23 @@ abstract class CoSDatabase : RoomDatabase() {
         fun build(context: Context): CoSDatabase =
             Room.databaseBuilder(context, CoSDatabase::class.java, "cos.db")
                 .addCallback(FtsSyncCallback)
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
+
+        /** v2 → v3: add the `memory` table (dated memories with proactive reminders). */
+        val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `memory` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`text` TEXT NOT NULL, " +
+                        "`remindAt` INTEGER, " +
+                        "`hasTime` INTEGER NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_memory_remindAt` ON `memory` (`remindAt`)")
+            }
+        }
 
         /**
          * v1 → v2: add the `occasion` table (DOM-16). A real, data-preserving migration — nothing
